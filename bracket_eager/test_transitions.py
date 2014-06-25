@@ -235,6 +235,7 @@ def test_gold_top(start_state, g_01_23):
     s.apply(stack, queue)
     s.apply(stack, queue)
     b1.apply(stack, queue)
+    m.apply(stack, queue)
     s.apply(stack, queue)
     s.apply(stack, queue)
     assert not queue
@@ -245,10 +246,12 @@ def test_gold_top(start_state, g_01_23):
     assert not b1.is_gold(stack, queue, golds.next())
     assert not b2.is_gold(stack, queue, golds.next())
     assert not b_top.is_gold(stack, queue, golds.next())
+    print stack[0].production
+    print stack[-1].production
+    g = golds.next()
+    print g.production
     assert m.is_gold(stack, queue, golds.next())
     m.apply(stack, queue)
-    print stack[0].production
-    print stack[1].production
     assert not m.is_gold(stack, queue, golds.next())
     assert not b1.is_gold(stack, queue, golds.next())
     assert not b2.is_gold(stack, queue, golds.next())

@@ -70,6 +70,8 @@ class DoMerge(Action):
     def is_gold(self, stack, queue, next_gold):
         if not self.is_valid(stack, queue):
             return False
+        if next_gold.children[-1] == stack[-1]:
+            return False
         return stack[-1].start != next_gold.start or stack[-1].end != next_gold.end
 
 
