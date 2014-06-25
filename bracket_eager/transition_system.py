@@ -70,7 +70,7 @@ class DoMerge(Action):
     def is_gold(self, stack, queue, next_gold):
         if not self.is_valid(stack, queue):
             return False
-        return stack[-1].edges_match(next_gold)
+        return stack[-1].start != next_gold.start or stack[-1].end != next_gold.end
 
 
 class DoBracket(Action):
@@ -88,10 +88,13 @@ class DoBracket(Action):
         if not self.is_valid(stack, queue):
             return False
         s0 = stack[-1]
-        return s0.end == next_gold[-1].end and s0.label != next_gold.label
+        assert s0 != next_gold
+        return s0.end == next_gold.end and \
+               s0.label != next_gold.label and \
+               self.label == next_gold.label
 
 
-def iter_golds(stack, queue, golds):
+def iter_gold(stack, queue, golds):
     """Iterate through the golds for the oracle, discarding golds whose cost
     is sunk. The stack/queue will be modified in-place by the outside context,
     as parsing proceeds."""
@@ -99,43 +102,12 @@ def iter_golds(stack, queue, golds):
     while golds:
         if not stack:
             yield golds[0]
-        starts = set([n.start for n in stack]
+        starts = set([n.start for n in stack])
         if golds[0] == stack[-1]:
             golds.pop(0)
         elif golds[0].start >= stack[-1].start:
             yield golds[0]
         if golds[0].end < stack[-1].end or golds[0].start not in starts:
             golds.pop(0)
-
-
-def oracle(moves, stack, golds):
-    if not stack or not golds:
-        return set([SHIFT])
-    if golds[0].end > stack[-1].end:
-        return set([SHIFT])
-    print 'First gold', golds[0].start, golds[0].end
-    print 'Stack:', stack[-1].start, stack[-1].end
-    # Stop considering golds that we've advanced past the end of
-    while golds and golds[0].end < stack[-1].end:
-        golds.pop()
-    if not golds:
-        return set([SHIFT])
-    # Stop considering golds we can't match the start of
-    while golds and golds[-1].start not in [n.start for n in stack]:
-        golds.pop()
-
-    g = golds[0]
-    g2 = golds[1] if len(golds) >= 2 else None
-    s0 = stack[-1]
-    # Sunk bracket: Advance, or merge
-    if g.end != s0.end:
-        return set([MERGE, SHIFT])
-    # Label is wrong, so introduce a new bracket
-    elif g.label != s0.label:
-        return set(a for a in moves if a.move == BRACKET and a.label == g.label)
-    elif g.start < s0.start:
-        return set([MERGE])
-    elif g2 and g2.end == s0.end:
-        return set(a for a in actions if a.move == BRACKET and a.label == g.label)
-    else:
-        return set([SHIFT])
+        else:
+            yield golds[0]

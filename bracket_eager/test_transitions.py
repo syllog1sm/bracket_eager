@@ -155,54 +155,101 @@ def test_merge(ssb_state, actions):
 
 
 def test_shift_oracle(start_state, g_01_23, actions):
-    stack, queue = start_state
     assert len(g_01_23) == 3
+    stack, queue = start_state
+    gold = iter_gold(stack, queue, g_01_23)
     s = actions[SHIFT]
-    assert s.is_valid(stack, queue)
-    assert SHIFT in oracle(actions.values(), stack, g_01_23)
+    assert s.is_gold(stack, queue, gold.next())
     s.apply(stack, queue)
-    assert s.is_valid(stack, queue)
-    assert SHIFT in oracle(actions.values(), stack, g_01_23)
+    assert s.is_gold(stack, queue, gold.next())
     s.apply(stack, queue)
-    assert s.is_valid(stack, queue)
-    assert SHIFT not in oracle(actions.values(), stack, g_01_23)
+    assert not s.is_gold(stack, queue, gold.next())
     s.apply(stack, queue)
-    assert SHIFT in oracle(actions.values(), stack, g_01_23)
+    assert s.is_gold(stack, queue, gold.next())
 
 
 def test_bracket_oracle(start_state, g_01_23):
+    assert len(g_01_23) == 3
     s = DoShift(0)
     b1 = DoBracket(1, label='NP1')
     b2 = DoBracket(2, label='NP2')
     b_top = DoBracket(3, label='TOP')
-    actions = [s, b1, b2]
     stack, queue = start_state
+    golds = iter_gold(stack, queue, g_01_23)
     s.apply(stack, queue)
-    assert len(g_01_23) == 3
-    assert b1.is_valid(stack, queue)
-    g = oracle(actions, stack, g_01_23)
-    assert len(g_01_23) == 3
-    assert b1 not in g
-    assert b2 not in g
-    assert b_top not in g
+    assert not b1.is_gold(stack, queue, golds.next())
+    assert not b2.is_gold(stack, queue, golds.next())
+    assert not b_top.is_gold(stack, queue, golds.next())
     s.apply(stack, queue)
-    g = oracle(actions, stack, g_01_23)
-    assert len(g_01_23) == 3
-    assert b1.is_valid(stack, queue)
-    assert b1 in g
-    assert b2 not in g
-    assert b_top not in g
-    b1.apply(stack, oracle)
-    g = oracle(actions, stack, g_01_23)
-    assert b1 not in g
-    assert b2 not in g
-    assert b_top not in g
-    assert SHIFT not in oracle(actions, stack, list(g_01_23))
+    assert b1.is_gold(stack, queue, golds.next())
+    assert not b2.is_gold(stack, queue, golds.next())
+    assert not b_top.is_gold(stack, queue, golds.next())
+    b1.apply(stack, queue)
+    assert not b1.is_gold(stack, queue, golds.next())
+    assert not b2.is_gold(stack, queue, golds.next())
+    assert not b_top.is_gold(stack, queue, golds.next())
     s.apply(stack, queue)
-    g = oracle(actions, stack, g_01_23)
-    assert s.is_valid(stack, queue)
-    assert SHIFT in oracle(actions, stack, list(g_01_23))
-    assert b1 not in g
-    assert b2 not in g
-    assert b_top not in g
+    assert s.is_gold(stack, queue, golds.next())
+    assert not b1.is_gold(stack, queue, golds.next())
+    assert not b2.is_gold(stack, queue, golds.next())
+    assert not b_top.is_gold(stack, queue, golds.next())
  
+ 
+def test_merge_oracle(start_state, g_01_23):
+    assert len(g_01_23) == 3
+    s = DoShift(0)
+    b1 = DoBracket(1, label='NP1')
+    b2 = DoBracket(2, label='NP2')
+    b_top = DoBracket(3, label='TOP')
+    m = DoMerge(4)
+    stack, queue = start_state
+    golds = iter_gold(stack, queue, g_01_23)
+    s.apply(stack, queue)
+    s.apply(stack, queue)
+    b1.apply(stack, queue)
+    assert not s.is_gold(stack, queue, golds.next())
+    assert not b1.is_gold(stack, queue, golds.next())
+    assert not b2.is_gold(stack, queue, golds.next())
+    assert not b_top.is_gold(stack, queue, golds.next())
+    assert m.is_gold(stack, queue, golds.next())
+    m.apply(stack, queue)
+    s.apply(stack, queue)
+    assert not m.is_valid(stack, queue)
+    assert not b1.is_gold(stack, queue, golds.next())
+    assert not b2.is_gold(stack, queue, golds.next())
+    assert not b_top.is_gold(stack, queue, golds.next())
+    b2.apply(stack, queue)
+    assert s.is_gold(stack, queue, golds.next())
+    assert m.is_gold(stack, queue, golds.next())
+
+
+def test_gold_top(start_state, g_01_23):
+    assert len(g_01_23) == 3
+    s = DoShift(0)
+    b1 = DoBracket(1, label='NP1')
+    b2 = DoBracket(2, label='NP2')
+    b_top = DoBracket(3, label='TOP')
+    m = DoMerge(4)
+    stack, queue = start_state
+    golds = iter_gold(stack, queue, g_01_23)
+    s.apply(stack, queue)
+    s.apply(stack, queue)
+    b1.apply(stack, queue)
+    s.apply(stack, queue)
+    s.apply(stack, queue)
+    assert not queue
+    assert not s.is_valid(stack, queue)
+    assert not b_top.is_gold(stack, queue, golds.next())
+    assert b2.is_gold(stack, queue, golds.next())
+    b2.apply(stack, queue)
+    assert not b1.is_gold(stack, queue, golds.next())
+    assert not b2.is_gold(stack, queue, golds.next())
+    assert not b_top.is_gold(stack, queue, golds.next())
+    assert m.is_gold(stack, queue, golds.next())
+    m.apply(stack, queue)
+    assert not m.is_gold(stack, queue, golds.next())
+    assert not b1.is_gold(stack, queue, golds.next())
+    assert not b2.is_gold(stack, queue, golds.next())
+    assert b_top.is_gold(stack, queue, golds.next())
+
+
