@@ -1,3 +1,7 @@
+from collections import defaultdict
+import pickle
+
+
 class Perceptron(object):
     def __init__(self, classes=None):
         # Each feature gets its own weight vector, so weights is a dict-of-arrays

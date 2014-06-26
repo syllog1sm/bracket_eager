@@ -1,4 +1,6 @@
 import read_ptb
+import tree
+
 import pytest
 
 from os import path
@@ -25,11 +27,11 @@ def test_split(sentence_strings):
 
 
 def test_tree_read(sentence_strings):
-    brackets = read_ptb.get_brackets(sentence_strings[0])
+    words, brackets = read_ptb.get_brackets(sentence_strings[0])
     assert len(brackets) == 29
     string = ("Pierre Vinken , 61 years old , will join the board as a nonexecutive "
               "director Nov. 29 .")
-    words = string.split()
+    word_strings = string.split()
     starts = [s for l, s, e in brackets]
     ends = [e for l, s, e in brackets]
     assert min(starts) == 0

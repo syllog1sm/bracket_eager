@@ -1,15 +1,61 @@
+import os
+from os import path
+from collections import defaultdict
+from . import util
+from .perceptron import Perceptron
+
+START = ['-START-', '-START2-']
+END = ['-END-', '-END2-']
+ 
+ 
+class DefaultList(list):
+    """A list that returns a default value if index out of bounds."""
+    def __init__(self, default=None):
+        self.default = default
+        list.__init__(self)
+ 
+    def __getitem__(self, index):
+        try:
+            return list.__getitem__(self, index)
+        except IndexError:
+            return self.default
+ 
+ 
+def setup_dir(model_dir, sentences):
+    classes, tagdict = _make_tagdict(sentences)
+    util.Config.write(model_dir, 'tagger', tagdict=tagdict, tags=classes)
+    
+
+def _make_tagdict(sentences):
+    '''Make a tag dictionary for single-tag words.'''
+    counts = defaultdict(lambda: defaultdict(int))
+    classes = {}
+    for sent in sentences:
+        for word in sent:
+            counts[word.lex][word.label] += 1
+            classes[word.label] = True
+    freq_thresh = 20
+    ambiguity_thresh = 0.97
+    tagdict = {}
+    for word, tag_freqs in counts.items():
+        tag, mode = max(tag_freqs.items(), key=lambda item: item[1])
+        n = sum(tag_freqs.values())
+        # Don't add rare words to the tag dictionary
+        # Only add quite unambiguous words
+        if n >= freq_thresh and (float(mode) / n) >= ambiguity_thresh:
+            tagdict[word] = tag
+    return classes, tagdict
+
+
 class Tagger(object):
     '''Greedy Averaged Perceptron tagger'''
-    model_loc = os.path.join(os.path.dirname(__file__), 'tagger.pickle')
-    def __init__(self, classes=None, load=True):
-        self.tagdict = {}
-        if classes:
-            self.classes = classes
-        else:
-            self.classes = set()
-        self.model = Perceptron(self.classes)
-        if load:
-            self.load(PerceptronTagger.model_loc)
+    def __init__(self, model_dir):
+        self.model_dir = model_dir
+        self.cfg = util.Config.read(model_dir, 'tagger')
+        self.tagdict = self.cfg.tagdict
+        self.model = Perceptron(self.cfg.tags)
+        if path.exists(path.join(model_dir, 'tagger.pickle')):
+            self.model.load(path.join(model_dir, 'tagger.pickle'))
 
     def tag(self, words, tokenize=True):
         prev, prev2 = START
@@ -24,24 +70,8 @@ class Tagger(object):
             prev2 = prev; prev = tag
         return tags
 
-    def start_training(self, sentences):
-        self._make_tagdict(sentences)
-        self.model = Perceptron(self.classes)
-
-    def train(self, sentences, save_loc=None, nr_iter=5):
-        '''Train a model from sentences, and save it at save_loc. nr_iter
-        controls the number of Perceptron training iterations.'''
-        self.start_training(sentences)
-        for iter_ in range(nr_iter):
-            for words, tags in sentences:
-                self.train_one(words, tags)
-            random.shuffle(sentences)
-        self.end_training(save_loc)
-
     def save(self):
-        # Pickle as a binary file
-        pickle.dump((self.model.weights, self.tagdict, self.classes),
-                    open(PerceptronTagger.model_loc, 'wb'), -1)
+        self.model.save(path.join(self.model_dir, 'tagger.pickle'))
 
     def train_one(self, words, tags):
         prev, prev2 = START
@@ -94,22 +124,5 @@ class Tagger(object):
         add('i+1 suffix', context[i+1][-3:])
         add('i+2 word', context[i+2])
         return features
-
-    def _make_tagdict(self, sentences):
-        '''Make a tag dictionary for single-tag words.'''
-        counts = defaultdict(lambda: defaultdict(int))
-        for sent in sentences:
-            for word, tag in zip(sent[0], sent[1]):
-                counts[word][tag] += 1
-                self.classes.add(tag)
-        freq_thresh = 20
-        ambiguity_thresh = 0.97
-        for word, tag_freqs in counts.items():
-            tag, mode = max(tag_freqs.items(), key=lambda item: item[1])
-            n = sum(tag_freqs.values())
-            # Don't add rare words to the tag dictionary
-            # Only add quite unambiguous words
-            if n >= freq_thresh and (float(mode) / n) >= ambiguity_thresh:
-                self.tagdict[word] = tag
 
 

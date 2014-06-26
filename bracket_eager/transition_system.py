@@ -20,7 +20,7 @@ def get_parse_from_state(stack, queue):
 
 def get_actions(node_labels):
     actions = [DoShift(0), DoMerge(1)]
-    for label in labels:
+    for label in node_labels:
         actions.append(DoBracket(len(actions), label=label))
     return actions
 
@@ -89,6 +89,8 @@ class DoBracket(Action):
     def is_gold(self, stack, queue, next_gold):
         if not self.is_valid(stack, queue):
             return False
+        if next_gold is None:
+            return False
         s0 = stack[-1]
         assert s0 != next_gold
         return s0.end == next_gold.end and \
@@ -101,15 +103,15 @@ def iter_gold(stack, queue, golds):
     is sunk. The stack/queue will be modified in-place by the outside context,
     as parsing proceeds."""
     golds = list(golds)
-    while golds:
+    while True:
+        starts = set([n.start for n in stack])
         if not stack:
             yield golds[0]
-        starts = set([n.start for n in stack])
-        if golds[0] == stack[-1]:
+        elif golds[0] == stack[-1]:
             golds.pop(0)
         elif golds[0].start >= stack[-1].start:
             yield golds[0]
-        if golds[0].end < stack[-1].end or golds[0].start not in starts:
+        elif golds[0].end < stack[-1].end or golds[0].start not in starts:
             golds.pop(0)
         else:
             yield golds[0]
