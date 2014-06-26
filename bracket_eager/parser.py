@@ -27,7 +27,7 @@ def setup_dir(model_dir, sentences, **kwargs):
     util.Config.write(model_dir, 'config', node_labels=node_labels, **kwargs)
  
 
-def train(model_dir, sentences, nr_iter=5):
+def train(model_dir, sentences, nr_iter=15):
     setup_dir(model_dir, sentences, nr_iter=nr_iter)
     tagger.setup_dir(model_dir, [sent.leaves() for sent in sentences])
     parser = Parser(model_dir)
@@ -38,6 +38,10 @@ def train(model_dir, sentences, nr_iter=5):
             assert words
             parser.train_one(itn, [w.lex for w in words], sentence)
             parser.tagger.train_one([w.lex for w in words], [w.label for w in words])
+        print itn, 'Parse:', parser.model.accuracy_string,
+        print 'Tag:', parser.tagger.model.accuracy_string
+        parser.model.nr_correct = 0
+        parser.model.nr_total = 0
     parser.model.average_weights()
     parser.tagger.model.average_weights()
     parser.save()
@@ -59,6 +63,9 @@ class Parser(object):
         self.tagger.save()
     
     def parse(self, word_strings):
+        # Getting passed a string when you want a list sucks to debug.
+        assert not isinstance(word_strings, str)
+        assert not isinstance(word_strings, unicode)
         # This closure is called by the "max" function. It returns a comparison
         # key, which makes max return the best-scoring valid action.
         def cmp_valid(action):
@@ -66,11 +73,12 @@ class Parser(object):
 
         tags = self.tagger.tag(word_strings)
         stack, queue = get_start_state(word_strings, tags)
-        while not is_end_start(stack, queue):
+        while not is_end_state(stack, queue):
             features = extract_features(stack, queue)
             scores = self.model.score(features)
             # Get highest scoring valid action
             best_action = max(self.actions, key=cmp_valid) 
+            assert best_action.is_valid(stack, queue)
             best_action.apply(stack, queue)
         return get_parse_from_state(stack, queue)
 
@@ -82,16 +90,24 @@ class Parser(object):
             return (is_valid, scores[action.i])
 
         def score_if_gold(action):
-            is_gold = action.is_gold(stack, queue, golds.next())
+            is_gold = action.is_gold(stack, queue, target_bracket)
             return (is_gold, scores[action.i])
-
         tags = self.tagger.tag(word_strings)
         stack, queue = get_start_state(word_strings, tags)
         golds = iter_gold(stack, queue, gold_tree.depth_list())
+        nr_moves = 0
+        nr_correct = 0
         while not is_end_state(stack, queue):
+            target_bracket = golds.next()
             features = extract_features(stack, queue)
             scores = self.model.score(features)
             guess = max(self.actions, key=score_if_valid)
+            assert guess.is_valid
             gold = max(self.actions, key=score_if_gold)
+            if not gold.is_gold(stack, queue, target_bracket):
+                print [n.start for n in stack]
+                print 'Stack:', stack[-1]
+                print 'Target', target_bracket
+                raise StandardError
             self.model.update(gold.i, guess.i, features)
             guess.apply(stack, queue)

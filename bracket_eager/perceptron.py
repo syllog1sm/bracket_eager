@@ -16,6 +16,13 @@ class Perceptron(object):
         self._tstamps = defaultdict(int)
         # Number of instances seen
         self.i = 0
+        self.nr_correct = 0
+        self.nr_total = 0
+
+    @property
+    def accuracy_string(self):
+        acc = float(self.nr_correct) / self.nr_total
+        return '%.2f' % (self.nr_correct, self.nr_total, acc * 100)
 
     def predict(self, features):
         '''Dot-product the features and current weights and return the best class.'''
@@ -44,7 +51,9 @@ class Perceptron(object):
             self.weights[f][c] = w + v
 
         self.i += 1
+        self.nr_total += 1
         if truth == guess:
+            self.nr_correct += 1
             return None
         for f in features:
             weights = self.weights.setdefault(f, {})

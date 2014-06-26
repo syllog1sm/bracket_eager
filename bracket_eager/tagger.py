@@ -53,7 +53,7 @@ class Tagger(object):
         self.model_dir = model_dir
         self.cfg = util.Config.read(model_dir, 'tagger')
         self.tagdict = self.cfg.tagdict
-        self.model = Perceptron(self.cfg.tags)
+        self.model = Perceptron(sorted(self.cfg.tags))
         if path.exists(path.join(model_dir, 'tagger.pickle')):
             self.model.load(path.join(model_dir, 'tagger.pickle'))
 

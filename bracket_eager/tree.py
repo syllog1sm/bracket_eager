@@ -3,11 +3,12 @@ def from_brackets(words, brackets):
     children = []
     for label, start, end in brackets:
         # Trim labels
-        if label != '-NONE-':
+        if not label.startswith('-'):
             assert label.split('-')[0], label
-            label = label.split('-')[0]
+            label = label.split('-')[0].split('=')[0]
         if (start + 1) == end and start not in seen_words:
             children.append(Word(start, words[start], label=label))
+            seen_words.add(start)
         else:
             for i, first_child in enumerate(children):
                 if start == first_child.start:
@@ -23,6 +24,10 @@ def from_brackets(words, brackets):
     for node in top.iter_nodes():
         node.prune_traces()
     top.prune_empty()
+    for i, w in enumerate(top.leaves()):
+        w.i = i
+        w.start = i
+        w.end = i+1
     return top
 
 
@@ -31,8 +36,14 @@ class Node(object):
         self.children = []
         self.label = label
 
-    def __eq__(self, o):
-        return False
+    @property
+    def unary_depth(self):
+        d = 0
+        n = self
+        while len(n.children) == 1:
+            d += 1
+            n = n.children[0]
+        return d
 
     def depth_list(self):
         nodes = []
@@ -50,6 +61,8 @@ class Word(Node):
         self.start = i
         self.end = i + 1
         self.production = (self.label, tuple())
+        self.is_leaf = True
+        self.depth = 0
 
     def __repr__(self):
         return '%s_%d' % (self.lex, self.i)
@@ -58,6 +71,9 @@ class Word(Node):
         if not isinstance(o, Word):
             return False
         return self.i == o.i
+
+    def to_ptb(self, indent=0):
+        return '(%s %s)' % (self.label, self.lex)
 
     def depth_list(self):
         return []
@@ -76,10 +92,23 @@ class Bracket(Node):
     def __init__(self, child, label=None):
         Node.__init__(self, label=label)
         self.children.append(child)
+        self.is_leaf = False
 
     def __repr__(self):
-        child_labels = ' '.join('%s_%d' % (n.label, n.end) for n in self.children)
-        return '%s_%d --> %s' % (self.label, self.start, child_labels)
+        child_labels = ' '.join('%s_%d-%d' % (n.label, n.start, n.end) for n in self.children)
+        return '%s --> %s' % (self.label, child_labels)
+
+    def __eq__(self, o):
+        return self.start == o.start and self.end == o.end and self.label == o.label
+
+    def to_ptb(self, indent=0):
+        pieces = []
+        for child in self.children:
+            if not child.is_leaf:
+                pieces.append('\n')
+            pieces.append(child.to_ptb(indent+1))
+        indent_str = '  ' * indent
+        return indent_str + '(%s ' % self.label + ' '.join(pieces) + ' )'
 
     @property
     def production(self):

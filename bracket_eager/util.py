@@ -34,6 +34,7 @@ def get_node_labels(sentences):
     for sent in sentences:
         queue = [sent]
         for node in queue:
-            labels[node.label] = True
-            queue.extend(node.children)
+            if not node.is_leaf:
+                labels[node.label] = True
+                queue.extend(node.children)
     return labels

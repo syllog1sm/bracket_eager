@@ -1,6 +1,8 @@
 import pytest
 
 from transition_system import *
+import read_ptb
+import tree
 
 
 @pytest.fixture
@@ -52,6 +54,12 @@ def test_end_state(start_state):
     shift.apply(stack, queue)
     shift.apply(stack, queue)
     shift.apply(stack, queue)
+    b = DoBracket(1)
+    m = DoMerge(2)
+    b.apply(stack, queue)
+    m.apply(stack, queue)
+    m.apply(stack, queue)
+    m.apply(stack, queue)
     assert is_end_state(stack, queue)
     assert not shift.is_valid(stack, queue)
 
@@ -256,5 +264,106 @@ def test_gold_top(start_state, g_01_23):
     assert not b1.is_gold(stack, queue, golds.next())
     assert not b2.is_gold(stack, queue, golds.next())
     assert b_top.is_gold(stack, queue, golds.next())
+
+
+def test_unary_oracle_case():
+    ptb_str = """
+( (S
+    (NP-SBJ
+      (VP (VBG telling)
+        (NP (NNS lies) )))
+    (VP (VBZ is)
+      (ADJP-PRD (JJ wrong) ))
+  (. .) ))""".strip()
+    words, bare_brackets = read_ptb.get_brackets(ptb_str)
+    assert words == ['telling', 'lies', 'is', 'wrong', '.']
+    assert len(bare_brackets) == 11
+    top = tree.from_brackets(words, bare_brackets)
+    assert len(top.leaves()) == len(words), [l.lex for l in top.leaves()]
+    assert len(top.iter_nodes()) == 11
+    assert len(top.depth_list()) == 6
+    leaves = top.leaves()
+
+    stack, queue = get_start_state([w.lex for w in leaves], [w.label for w in leaves])
+    golds = iter_gold(stack, queue, top.depth_list())
+
+    s = DoShift(0)
+    m = DoMerge(1)
+    np = DoBracket(2, label='NP')
+    vp = DoBracket(3, label='VP')
+    adjp = DoBracket(4, label='ADJP')
+
+    s.apply(stack, queue)
+    s.apply(stack, queue)
+    assert np.is_gold(stack, queue, golds.next())
+    np.apply(stack, queue)
+    assert not np.is_gold(stack, queue, golds.next())
+    assert vp.is_gold(stack, queue, golds.next())
+    vp.apply(stack, queue)
+    m.apply(stack, queue)
+    next_gold = golds.next()
+    assert np.is_gold(stack, queue, next_gold)
+    np.apply(stack, queue)
+    assert not np.is_gold(stack, queue, golds.next())
+    assert not vp.is_gold(stack, queue, golds.next())
+
+
+def test_np_to_np():
+    ptb_str = """
+( (S 
+    (NP-SBJ (NNP Mr.) (NNP Vinken) )
+    (VP (VBZ is) 
+      (NP-PRD 
+        (NP (NN chairman) )
+        (PP (IN of) 
+          (NP 
+            (NP (NNP Elsevier) (NNP N.V.) )
+            (, ,) 
+            (NP (DT the) (NNP Dutch) (VBG publishing) (NN group) )))))
+    (. .) ))"""
+    words, bare_brackets = read_ptb.get_brackets(ptb_str)
+    top = tree.from_brackets(words, bare_brackets)
+    leaves = top.leaves()
+
+    st, q = get_start_state([w.lex for w in leaves], [w.label for w in leaves])
+    g = iter_gold(st, q, top.depth_list())
+
+    s = DoShift(0)
+    m = DoMerge(1)
+    np = DoBracket(2, label='NP')
+    vp = DoBracket(3, label='VP')
+    pp = DoBracket(3, label='PP')
+
+    s.apply(st, q)
+    s.apply(st, q)
+    np.apply(st, q)
+    m.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q)
+    assert np.is_gold(st, q, g.next())
+    np.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q)
+    assert np.is_gold(st, q, g.next())
+    np.apply(st, q)
+    assert m.is_gold(st, q, g.next())
+    m.apply(st, q)
+    s.apply(st, q)
+    assert not np.is_gold(st, q, g.next())
+    s.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q)
+    assert np.is_gold(st, q, g.next())
+    np.apply(st, q)
+    m.apply(st, q)
+    m.apply(st, q)
+    m.apply(st, q)
+    next_gold = g.next()
+    assert np.is_gold(st, q, next_gold), 'Stack: %s, Gold: %s' % (st[-1], next_gold)
+
+
+  
 
 
