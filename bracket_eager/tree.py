@@ -37,8 +37,6 @@ class Node(object):
         self.label = label
 
     def span_match(self, o):
-        if type(self) != type(o):
-            return False
         return self.start == o.start and self.end == o.end
 
     @property
@@ -67,6 +65,7 @@ class Word(Node):
         self.end = i + 1
         self.production = (self.label, tuple())
         self.is_leaf = True
+        self.is_unary = False
         self.depth = 0
 
     def __repr__(self):
@@ -111,6 +110,10 @@ class Bracket(Node):
         for child in self.children:
             pieces.append(child.to_ptb(indent+1))
         return '(%s ' % self.label + ' '.join(pieces) + ' )'
+
+    @property
+    def is_unary(self):
+        return not self.is_leaf and len(self.children) == 1
 
     @property
     def production(self):

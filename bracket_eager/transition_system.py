@@ -1,7 +1,8 @@
 import tree
 
-SHIFT = 0; BRACKET = 1; MERGE = 2;
-MOVES = (SHIFT, BRACKET, MERGE)
+SHIFT = 0; BRACKET = 1; MERGE = 2; UNARY = 3
+MOVES = (SHIFT, BRACKET, MERGE, UNARY)
+MOVE_NAMES = ('S', 'B', 'M', 'U')
 
 
 def get_start_state(words, tags):
@@ -19,27 +20,40 @@ def get_parse_from_state(stack, queue):
 
 
 def get_actions(node_labels):
-    actions = [DoShift(0), DoMerge(1)]
+    actions = []
     for label in sorted(node_labels):
-        actions.append(DoBracket(len(actions), label=label))
+        actions.append(DoShift(label=label))
+    for label in sorted(node_labels):
+        actions.append(DoUnary(label=label))
+    actions.append(DoBracket())
+    actions.append(DoMerge())
     return actions
 
 
 class Action(object):
-    def __init__(self, i, label):
-        self.i = i
+    nr_actions = 0
+    def __init__(self, label=None):
+        self.name = MOVE_NAMES[self.move]
+        if label:
+            try:
+                self.name += '-' + label
+            except TypeError:
+                raise TypeError("Label not stringish or falsey: " + repr(label))
         self.label = label
+        self.i = Action.nr_actions
+        Action.nr_actions += 1
 
     def __str__(self):
         return self.name
 
+    def is_gold(self, stack, queue, next_gold):
+        if not self.is_valid(stack, queue):
+            return False
+        return self._is_gold(stack[-1] if stack else None, next_gold)
+
 
 class DoShift(Action):
-    def __init__(self, i, label=None):
-        Action.__init__(self, i, label)
-        self.move = SHIFT
-        self.label = label
-        self.name = 'S'
+    move = SHIFT
 
     def apply(self, stack, queue):
         if self.label is not None:
@@ -51,19 +65,14 @@ class DoShift(Action):
             return False
         return bool(queue)
 
-    def is_gold(self, stack, queue, next_gold):
-        if not self.is_valid(stack, queue):
-            return False
-        if not stack:
+    def _is_gold(self, s0, next_gold):
+        if not s0:
             return True
-        return stack[-1].end != next_gold.end
+        return s0.end != next_gold.end
 
 
 class DoMerge(Action):
-    def __init__(self, i, label=None):
-        Action.__init__(self, i, label)
-        self.move = MERGE
-        self.name = 'M'
+    move = MERGE
 
     def apply(self, stack, queue):
         if self.label is not None:
@@ -73,54 +82,64 @@ class DoMerge(Action):
     def is_valid(self, stack, queue):
         return len(stack) >= 2 and isinstance(stack[-1], tree.Bracket)
 
-    def is_gold(self, stack, queue, next_gold):
-        if not self.is_valid(stack, queue):
+    def _is_gold(self, s0, next_gold):
+        if s0.span_match(next_gold):
             return False
-        # If the production on the stack is self-unary, we must merge
-        if stack[-1].children and stack[-1] == stack[-1].children[-1]:
-            return True
-        if next_gold.children[-1] == stack[-1]:
+        if next_gold.children and s0.span_match(next_gold.children[-1]):
             return False
-        return not stack[-1].span_match(next_gold)
+        return True
 
 
 class DoBracket(Action):
-    def __init__(self, i, label=None):
-        Action.__init__(self, i, label)
-        self.move = BRACKET
-        self.name = 'B-%s' % (label if label is not None else '?')
+    move = BRACKET
+
+    def apply(self, stack, queue):
+        s0 = stack.pop()
+        s1 = stack.pop()
+        bracket = tree.Bracket(s1, label=self.label)
+        bracket.children.append(s0)
+        stack.append(bracket)
+
+    def is_valid(self, stack, queue):
+        if len(stack) < 2:
+            return False
+        return True
+
+    def _is_gold(self, s0, next_gold):
+        if self.label and self.label != next_gold.label:
+            return False
+        if s0.end != next_gold.end:
+            return False
+        if not (next_gold.children and s0.span_match(next_gold.children[-1])):
+            return False
+        if s0.span_match(next_gold) and next_gold.is_unary and not s0.is_unary:
+            return False
+        return True
+
+
+class DoUnary(Action):
+    move = UNARY
 
     def apply(self, stack, queue):
         stack.append(tree.Bracket(stack.pop(), label=self.label))
 
-    def is_valid(self, stack, queue):
-        # Disallow unary chains of length 4. If we have 3 unaries in a row,
-        # we can't add another.
+    def is_valid(self, stack, gold):
         if not stack:
             return False
-        if len(stack) == 1 and self.label == stack[-1].label:
-            return False
-        if stack[-1].children and stack[-1] == stack[-1].children[-1]:
-            return False
-        if stack[-1].unary_depth >= 10:
+        if stack[-1].is_unary:
             return False
         return True
 
-    def is_gold(self, stack, queue, next_gold):
-        if not self.is_valid(stack, queue):
+    def _is_gold(self, s0, gold_parent):
+        if not gold_parent.is_unary:
             return False
-        s0 = stack[-1]
-        if s0.label == next_gold.label:
-            if s0 == next_gold.children[-1] and s0 != next_gold.children[-1].children[-1]:
-                need_new_bracket = True
-            else:
-                need_new_bracket = False
-        else:
-            need_new_bracket = True
-        assert s0 != next_gold
-        return s0.end == next_gold.end and \
-               need_new_bracket and \
-               self.label == next_gold.label
+        # TODO: Span-match should probably work with terminals
+        if not gold_parent.start == s0.start and gold_parent.end == s0.end:
+            return False
+        gold_child = gold_parent.children[0]
+        if self.label and self.label != gold_child.label:
+            return False
+        return True
 
 
 def iter_gold(stack, queue, golds):
@@ -134,8 +153,7 @@ def iter_gold(stack, queue, golds):
             yield golds[0]
         elif golds[0] == stack[-1]:
             golds.pop(0)
-        elif golds[0].span_match(stack[-1]) and \
-          not (golds[0].children and golds[0].children[-1].span_match(stack[-1])):
+        elif golds[0].span_match(stack[-1]) and not golds[0].is_unary:
             golds.pop(0)
         elif golds[0].start >= stack[-1].end:
             yield golds[0]
