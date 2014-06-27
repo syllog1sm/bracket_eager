@@ -109,6 +109,7 @@ class Parser(object):
                 print [n.start for n in stack]
                 print 'Stack:', stack[-1]
                 print 'Target', target_bracket
+                print target_bracket.children[-1]
                 raise StandardError
             self.model.update(gold.i, guess.i, features)
             guess.apply(stack, queue)

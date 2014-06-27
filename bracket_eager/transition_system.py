@@ -20,13 +20,11 @@ def get_parse_from_state(stack, queue):
 
 
 def get_actions(node_labels):
-    actions = []
+    actions = [DoShift(), DoMerge()]
     for label in sorted(node_labels):
-        actions.append(DoShift(label=label))
+        actions.append(DoBracket(label=label))
     for label in sorted(node_labels):
         actions.append(DoUnary(label=label))
-    actions.append(DoBracket())
-    actions.append(DoMerge())
     return actions
 
 
@@ -74,7 +72,11 @@ class DoMerge(Action):
         stack[-1].children.insert(0, stack.pop(-2))
 
     def is_valid(self, stack, queue):
-        return len(stack) >= 2 and isinstance(stack[-1], tree.Bracket)
+        if len(stack) < 2:
+            return False
+        if len(stack[-1].children) < 2:
+            return False
+        return True
 
     def _is_gold(self, s0, next_gold):
         if s0.span_match(next_gold):
@@ -104,7 +106,9 @@ class DoBracket(Action):
             return False
         if s0.end != next_gold.end:
             return False
-        if not (next_gold.children and s0.span_match(next_gold.children[-1])):
+        # Can we just M the bracket on the stack?
+        if len(s0.children) >= 2 and \
+          not (next_gold.children and s0.span_match(next_gold.children[-1])):
             return False
         if s0.span_match(next_gold) and next_gold.is_unary and not s0.is_unary:
             return False
@@ -121,6 +125,8 @@ class DoUnary(Action):
         if not stack:
             return False
         if stack[-1].is_unary:
+            return False
+        if self.label and stack[-1].label == self.label:
             return False
         return True
 
@@ -146,6 +152,8 @@ def iter_gold(stack, queue, golds):
         elif golds[0] == stack[-1]:
             golds.pop(0)
         elif golds[0].span_match(stack[-1]) and not golds[0].is_unary:
+            golds.pop(0)
+        elif stack[-1].is_unary and golds[0].is_unary:
             golds.pop(0)
         elif golds[0].start >= stack[-1].end:
             yield golds[0]
