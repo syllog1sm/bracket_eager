@@ -6,6 +6,7 @@ from . import tree
 
 
 def get_brackets(sent_text):
+    assert sent_text and sent_text.startswith('(')
     open_brackets = []
     brackets = []
     bracketsRE = re.compile(r'(\()([^\s\)\(]+)|([^\s\)\(]+)?(\))')
