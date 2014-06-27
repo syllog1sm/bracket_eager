@@ -15,7 +15,7 @@ def is_end_state(stack, queue):
 
 
 def get_parse_from_state(stack, queue):
-    return stack[0].to_ptb()
+    return '(TOP ' + stack[0].to_ptb() + ' )'
 
 
 def get_actions(node_labels):
@@ -81,7 +81,7 @@ class DoMerge(Action):
             return True
         if next_gold.children[-1] == stack[-1]:
             return False
-        return stack[-1].start != next_gold.start or stack[-1].end != next_gold.end
+        return not stack[-1].span_match(next_gold)
 
 
 class DoBracket(Action):
@@ -101,6 +101,8 @@ class DoBracket(Action):
         if len(stack) == 1 and self.label == stack[-1].label:
             return False
         if stack[-1].children and stack[-1] == stack[-1].children[-1]:
+            return False
+        if stack[-1].unary_depth >= 10:
             return False
         return True
 
@@ -131,6 +133,9 @@ def iter_gold(stack, queue, golds):
         if not stack:
             yield golds[0]
         elif golds[0] == stack[-1]:
+            golds.pop(0)
+        elif golds[0].span_match(stack[-1]) and \
+          not (golds[0].children and golds[0].children[-1].span_match(stack[-1])):
             golds.pop(0)
         elif golds[0].start >= stack[-1].end:
             yield golds[0]

@@ -22,7 +22,7 @@ class Perceptron(object):
     @property
     def accuracy_string(self):
         acc = float(self.nr_correct) / self.nr_total
-        return '%.2f' % (self.nr_correct, self.nr_total, acc * 100)
+        return '%.2f' % (acc * 100)
 
     def predict(self, features):
         '''Dot-product the features and current weights and return the best class.'''

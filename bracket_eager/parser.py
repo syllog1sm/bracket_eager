@@ -105,6 +105,7 @@ class Parser(object):
             assert guess.is_valid
             gold = max(self.actions, key=score_if_gold)
             if not gold.is_gold(stack, queue, target_bracket):
+                print
                 print [n.start for n in stack]
                 print 'Stack:', stack[-1]
                 print 'Target', target_bracket

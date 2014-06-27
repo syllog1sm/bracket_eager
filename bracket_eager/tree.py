@@ -36,6 +36,11 @@ class Node(object):
         self.children = []
         self.label = label
 
+    def span_match(self, o):
+        if type(self) != type(o):
+            return False
+        return self.start == o.start and self.end == o.end
+
     @property
     def unary_depth(self):
         d = 0
@@ -104,11 +109,8 @@ class Bracket(Node):
     def to_ptb(self, indent=0):
         pieces = []
         for child in self.children:
-            if not child.is_leaf:
-                pieces.append('\n')
             pieces.append(child.to_ptb(indent+1))
-        indent_str = '  ' * indent
-        return indent_str + '(%s ' % self.label + ' '.join(pieces) + ' )'
+        return '(%s ' % self.label + ' '.join(pieces) + ' )'
 
     @property
     def production(self):
@@ -128,8 +130,7 @@ class Bracket(Node):
         return self.start == o.start and self.end == o.end and self.label == o.label
 
     def prune_traces(self):
-        if len(self.children) == 1 and self.children[0].label == '-NONE-':
-            self.children = []
+        self.children = [n for n in self.children if n.label != '-NONE-']
 
     def prune_empty(self):
         for node in self.children:
