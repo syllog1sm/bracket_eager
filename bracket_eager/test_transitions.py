@@ -90,7 +90,7 @@ def test_shift(start_state):
 
 def test_bracket_validity(start_state):
     stack, queue = start_state
-    bracket = DoBracket(label='NP')
+    bracket = DoBracket()
     assert not bracket.is_valid(stack, queue)
     shift = DoShift()
     shift.apply(stack, queue)
@@ -100,16 +100,16 @@ def test_bracket_validity(start_state):
 
 def test_merge_validity(start_state):
     stack, queue = start_state
-    bracket = DoBracket(label='NP')
-    shift = DoShift()
-    merge = DoMerge()
-    assert not merge.is_valid(stack, queue)
-    shift.apply(stack, queue)
-    assert not merge.is_valid(stack, queue)
-    shift.apply(stack, queue)
-    shift.apply(stack, queue)
-    bracket.apply(stack, queue)
-    assert merge.is_valid(stack, queue)
+    b = DoBracket()
+    s = DoShift()
+    m = DoMerge()
+    assert not m.is_valid(stack, queue)
+    s.apply(stack, queue)
+    assert not m.is_valid(stack, queue)
+    s.apply(stack, queue)
+    s.apply(stack, queue)
+    b.apply(stack, queue)
+    assert m.is_valid(stack, queue)
 
 
 def goto(actions, stack, queue, hist):
@@ -159,7 +159,7 @@ def test_bracket(ss_state, actions):
     assert stack[0].production == ('NN', tuple())
     actions[BRACKET].apply(stack, queue)
     assert stack[0].label == 'NP'
-    assert stack[0].production == ('NP', ('NN', 'NN'))
+    assert stack[0].production == (None, ('NN', 'NN'))
  
 
 def test_merge(sssb_state, actions):
@@ -171,13 +171,13 @@ def test_merge(sssb_state, actions):
     assert stack[1].end == 3
     m = actions[MERGE]
     q_before = list(queue)
-    assert stack[1].production == ('NP', ('NN', 'NN'))
+    assert stack[1].production == (None, ('NN', 'NN'))
     m.apply(stack, queue)
     assert len(stack) == 1
     assert queue == q_before
     assert stack[0].start == 0
     assert stack[0].end == 3
-    assert stack[0].production == ('NP', ('NN', 'NN', 'NN'))
+    assert stack[0].production == (None, ('NN', 'NN', 'NN'))
     assert not m.is_valid(stack, queue) 
 
 
