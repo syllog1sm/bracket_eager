@@ -298,6 +298,51 @@ def test_unary_oracle_case():
     assert not u.is_valid(stack, queue)
 
 
+def test_unary_oracle_case_labelled():
+    ptb_str = """
+( (S
+    (NP-SBJ
+      (VP (VBG telling)
+        (NP (NNS lies) )))
+    (VP (VBZ is)
+      (ADJP-PRD (JJ wrong) ))
+  (. .) ))""".strip()
+    words, bare_brackets = read_ptb.get_brackets(ptb_str)
+    assert words == ['telling', 'lies', 'is', 'wrong', '.']
+    assert len(bare_brackets) == 11
+    top = tree.from_brackets(words, bare_brackets)
+    assert len(top.leaves()) == len(words), [l.lex for l in top.leaves()]
+    assert len(top.iter_nodes()) == 11
+    assert len(top.depth_list()) == 6
+    leaves = top.leaves()
+
+    stack, queue = get_start_state([w.lex for w in leaves], [w.label for w in leaves])
+    golds = iter_gold(stack, queue, top.depth_list())
+
+    s = DoShift()
+    m = DoMerge()
+    np = DoBracket(label='NP')
+    vp = DoBracket(label='VP')
+    adjp = DoBracket(label='ADJP')
+    u_np = DoUnary(label='NP')
+
+    s.apply(stack, queue)
+    s.apply(stack, queue)
+    next_gold = golds.next()
+    assert next_gold.is_unary
+    assert u_np.is_valid(stack, queue)
+    assert u_np.is_gold(stack, queue, next_gold)
+    u_np.apply(stack, queue)
+    assert vp.is_gold(stack, queue, golds.next())
+    assert not np.is_gold(stack, queue, golds.next())
+    vp.apply(stack, queue)
+    next_gold = golds.next()
+    assert u_np.is_gold(stack, queue, next_gold)
+    u_np.apply(stack, queue)
+    assert not u_np.is_valid(stack, queue)
+
+
+
 def test_np_to_np():
     ptb_str = """
 ( (S 

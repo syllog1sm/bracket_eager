@@ -56,33 +56,21 @@ class DoShift(Action):
     move = SHIFT
 
     def apply(self, stack, queue):
-        if self.label is not None:
-            queue[0].label = self.label
         stack.append(queue.pop(0))
 
     def is_valid(self, stack, queue):
-        if stack and stack[-1].children and stack[-1] == stack[-1].children[-1]:
-            return False
         return bool(queue)
 
     def _is_gold(self, s0, next_gold):
         if not s0:
             return True
-        if s0.end == next_gold.end:
-            return False
-        assert next_gold.children
-        gold_child = next_gold.children[-1]
-        if self.label and gold_child.span_match(s0) and self.label != gold_child.label:
-            return False
-        return True
+        return s0.end != next_gold.end
 
 
 class DoMerge(Action):
     move = MERGE
 
     def apply(self, stack, queue):
-        if self.label is not None:
-            stack[-1].label = self.label
         stack[-1].children.insert(0, stack.pop(-2))
 
     def is_valid(self, stack, queue):
@@ -112,6 +100,8 @@ class DoBracket(Action):
         return True
 
     def _is_gold(self, s0, next_gold):
+        if self.label and self.label != next_gold.label:
+            return False
         if s0.end != next_gold.end:
             return False
         if not (next_gold.children and s0.span_match(next_gold.children[-1])):
@@ -139,8 +129,7 @@ class DoUnary(Action):
             return False
         if not gold_parent.span_match(s0):
             return False
-        gold_child = gold_parent.children[0]
-        if self.label and self.label != gold_child.label:
+        if self.label and self.label != gold_parent.label:
             return False
         return True
 
