@@ -288,15 +288,14 @@ def test_unary_oracle_case():
 
     s.apply(stack, queue)
     s.apply(stack, queue)
-    next_gold = golds.next()
+    next_gold, _ = golds.next()
     assert next_gold.is_unary
     assert u.is_valid(stack, queue)
-    assert u.is_gold(stack, queue, next_gold)
+    assert u.is_gold(stack, queue, golds.next())
     u.apply(stack, queue)
     assert vp.is_gold(stack, queue, golds.next())
     vp.apply(stack, queue)
-    next_gold = golds.next()
-    assert u.is_gold(stack, queue, next_gold)
+    assert u.is_gold(stack, queue, golds.next())
     u.apply(stack, queue)
     assert not u.is_valid(stack, queue)
 
@@ -331,16 +330,15 @@ def test_unary_oracle_case_labelled():
 
     s.apply(stack, queue)
     s.apply(stack, queue)
-    next_gold = golds.next()
+    next_gold, _ = golds.next()
     assert next_gold.is_unary
     assert u_np.is_valid(stack, queue)
-    assert u_np.is_gold(stack, queue, next_gold)
+    assert u_np.is_gold(stack, queue, golds.next())
     u_np.apply(stack, queue)
     assert vp.is_gold(stack, queue, golds.next())
     assert not np.is_gold(stack, queue, golds.next())
     vp.apply(stack, queue)
-    next_gold = golds.next()
-    assert u_np.is_gold(stack, queue, next_gold)
+    assert u_np.is_gold(stack, queue, golds.next())
     u_np.apply(stack, queue)
     assert not u_np.is_valid(stack, queue)
 
@@ -393,4 +391,63 @@ def test_np_to_np():
     m.apply(st, q)
     m.apply(st, q)
     next_gold = g.next()
-    assert b.is_gold(st, q, next_gold), 'Stack: %s, Gold: %s' % (st[-1], next_gold)
+    assert b.is_gold(st, q, g.next()), 'Stack: %s, Gold: %s' % (st[-1], next_gold)
+
+
+def test_m_overpredict():
+    ptb_str = """
+( (S 
+    (NP-SBJ-1 (DT The) (NN bill) )
+    (VP (VBZ intends) 
+      (S 
+        (NP-SBJ (-NONE- *-1) )
+        (VP (TO to) 
+          (VP (VB restrict) 
+            (NP (DT the) (NNP RTC) )
+            (PP-CLR (TO to) 
+              (NP (NNP Treasury) (NNS borrowings) (RB only) )))))
+      (, ,) 
+      (SBAR-ADV (IN unless) 
+        (S 
+          (NP-SBJ (DT the) (NN agency) )
+          (VP (VBZ receives) 
+            (NP (JJ specific) (JJ congressional) (NN authorization) )))))
+    (. .) ))"""
+
+    words, bare_brackets = read_ptb.get_brackets(ptb_str)
+    top = tree.from_brackets(words, bare_brackets)
+    leaves = top.leaves()
+
+    st, q = get_start_state([w.lex for w in leaves], [w.label for w in leaves])
+    g = iter_gold(st, q, top.depth_list())
+
+    s = DoShift()
+    m = DoMerge()
+    np = DoBracket('NP')
+    vp = DoBracket('VP')
+    pp = DoBracket('PP')
+    np = DoBracket('NP')
+    sbar = DoBracket('SBAR')
+    b_s = DoBracket('S')
+
+    s.apply(st, q) # the
+    s.apply(st, q) # bill
+    np.apply(st, q); assert len(st) == 1
+    s.apply(st, q) # intends
+    s.apply(st, q) # to
+    s.apply(st, q) # restrict
+    s.apply(st, q) # the
+    s.apply(st, q) # rtc
+    np.apply(st, q); assert len(st) == 5
+    
+    assert not vp.is_gold(st, q, g.next())
+    
+    vp.apply(st, q)
+
+    assert not m.is_gold(st, q, g.next())
+
+
+
+
+
+

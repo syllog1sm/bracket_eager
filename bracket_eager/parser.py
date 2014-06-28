@@ -139,6 +139,8 @@ class Parser(object):
             assert guess.is_valid(stack, queue)
             actions = [a for a in self.actions if a.is_gold(stack, queue, golds.next())]
             if not actions:
+                print target_bracket[0]
+                print format_state(stack, queue)
                 raise StandardError
             gold = max(actions, key=lambda a: scores[a.i])
             assert gold.is_gold(stack, queue, target_bracket)
@@ -155,4 +157,4 @@ def format_weights(clas, features, weights):
 
 
 def format_state(stack, queue):
-    return str(stack), '||', queue[:2]
+    return ', '.join(repr(s) for s in stack) +  ' || ' +  ' '.join(repr(q) for q in queue[:2])

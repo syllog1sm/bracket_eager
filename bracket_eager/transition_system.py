@@ -46,10 +46,12 @@ class Action(object):
     def __str__(self):
         return self.name
 
-    def is_gold(self, stack, queue, next_gold):
+    def is_gold(self, stack, queue, gold):
+        next_gold, all_golds = gold
+        starts = [n.start for n in all_golds]
         if not self.is_valid(stack, queue):
             return False
-        return self._is_gold(stack[-1] if stack else None, next_gold)
+        return self._is_gold(stack[-1] if stack else None, next_gold, starts)
 
     def check_grammar(self, result, *child_nodes):
         if not self.rules:
@@ -69,7 +71,7 @@ class DoShift(Action):
     def is_valid(self, stack, queue):
         return bool(queue)
 
-    def _is_gold(self, s0, next_gold):
+    def _is_gold(self, s0, next_gold, starts):
         if not s0:
             return True
         return s0.end != next_gold.end
@@ -88,10 +90,17 @@ class DoMerge(Action):
             return False
         return True
 
-    def _is_gold(self, s0, next_gold):
+    def is_gold(self, stack, queue, gold):
+        next_gold, all_golds = gold
+        starts = [n.start for n in all_golds]
+        if not self.is_valid(stack, queue):
+            return False
+        s0 = stack[-1]
         if s0.span_match(next_gold):
             return False
         if next_gold.children and s0.span_match(next_gold.children[-1]):
+            return False
+        if s0.start in starts:
             return False
         return True
 
@@ -111,7 +120,7 @@ class DoBracket(Action):
             return False
         return True
 
-    def _is_gold(self, s0, next_gold):
+    def _is_gold(self, s0, next_gold, starts):
         if self.label and self.label != next_gold.label:
             return False
         if s0.end != next_gold.end:
@@ -145,7 +154,7 @@ class DoUnary(Action):
             return False
         return self.check_grammar(self.label, stack[-1])
 
-    def _is_gold(self, s0, gold_parent):
+    def _is_gold(self, s0, gold_parent, starts):
         if not gold_parent.is_unary:
             return False
         if not gold_parent.span_match(s0):
@@ -163,7 +172,7 @@ def iter_gold(stack, queue, golds):
     while golds:
         starts = set([n.start for n in stack])
         if not stack:
-            yield golds[0]
+            yield golds[0], golds
         elif golds[0] == stack[-1]:
             golds.pop(0)
         elif golds[0].span_match(stack[-1]) and not golds[0].is_unary:
@@ -171,8 +180,8 @@ def iter_gold(stack, queue, golds):
         elif stack[-1].is_unary and golds[0].is_unary:
             golds.pop(0)
         elif golds[0].start >= stack[-1].end:
-            yield golds[0]
+            yield golds[0], golds
         elif golds[0].end < stack[-1].end or golds[0].start not in starts:
             golds.pop(0)
         else:
-            yield golds[0]
+            yield golds[0], golds
