@@ -478,5 +478,3 @@ def test_nested_b():
     assert g.next()[0].child_match(st[-1])
     assert st[-1].is_unary
     assert m.is_gold(st, q, g.next())
-    
-
