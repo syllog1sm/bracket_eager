@@ -1,3 +1,6 @@
+from collections import defaultdict
+
+
 def get_valid_stacks(rules, max_len=100):
     """Get the set of stacks that are valid prefixes of TOP"""
     assert max_len
@@ -19,10 +22,21 @@ def get_valid_stacks(rules, max_len=100):
 def rules_from_trees(trees):
     rules = {}
     for top in trees:
-        lhs, rhs = top.production
-        rules.setdefault(lhs, set()).add(rhs)
+        # left-hand side, right-hand side, e.g. S --> NP VP
+        lhs = top.label
+        rhs = _get_rhs(top.children)
+        rules.setdefault('TOP', {}).setdefault((lhs,), 0)
+        rules['TOP'][(lhs,)] += 1
+        rules.setdefault(lhs, {}).setdefault(rhs, 0)
+        rules[lhs][rhs] += 1
         for node in top.iter_nodes():
             if not node.is_leaf:
-                lhs, rhs = node.production
-                rules.setdefault(lhs, set()).add(rhs)
-    return rules
+                lhs = node.label
+                rhs = _get_rhs(node.children)
+                rules.setdefault(lhs, {}).setdefault(rhs, 0)
+                rules[lhs][rhs] += 1
+    return dict(rules)
+
+
+def _get_rhs(nodes):
+    return tuple(n.label for n in nodes)

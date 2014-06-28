@@ -57,5 +57,5 @@ def trees(ptb_text):
 
 def test_get_rules(trees):
     rules = rules_from_trees(trees)
-    assert len(rules) == 5
+    assert len(rules) == 6
 

@@ -124,5 +124,3 @@ class Tagger(object):
         add('i+1 suffix', context[i+1][-3:])
         add('i+2 word', context[i+2])
         return features
-
-

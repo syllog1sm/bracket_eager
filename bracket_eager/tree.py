@@ -67,6 +67,7 @@ class Word(Node):
         self.is_leaf = True
         self.is_unary = False
         self.depth = 0
+        self.head = self
 
     def __repr__(self):
         return '%s_%d' % (self.lex, self.i)
@@ -99,11 +100,22 @@ class Bracket(Node):
         self.is_leaf = False
 
     def __repr__(self):
-        child_labels = ' '.join('%s_%d-%d' % (n.label, n.start, n.end) for n in self.children)
-        return '%s --> %s' % (self.label, child_labels)
+        child_labels = []
+        for n in self.children:
+            if n.is_leaf:
+                child_labels.append('%s_%d' % (n.lex, n.i))
+            else:
+                child_labels.append('%s_%d-%d' % (n.label, n.start, n.end))
+        return '%s --> %s' % (self.label, ' '.join(child_labels))
 
     def __eq__(self, o):
-        return self.start == o.start and self.end == o.end and self.label == o.label
+        if self.label and o.label and self.label != o.label:
+            return False
+        if self.start != o.start:
+            return False
+        if self.end != o.end:
+            return False
+        return True
 
     def to_ptb(self, indent=0):
         pieces = []
@@ -127,10 +139,12 @@ class Bracket(Node):
     def end(self):
         return self.children[-1].end
 
-    def __eq__(self, o):
-        if not isinstance(o, Bracket):
-            return False
-        return self.start == o.start and self.end == o.end and self.label == o.label
+    @property
+    def head(self):
+        if not self.children:
+            return None
+        else:
+            return self.children[-1].head
 
     def prune_traces(self):
         self.children = [n for n in self.children if n.label != '-NONE-']

@@ -1,4 +1,5 @@
 import tree
+from .grammar import get_valid_stacks
 
 SHIFT = 0; BRACKET = 1; MERGE = 2; UNARY = 3
 MOVES = (SHIFT, BRACKET, MERGE, UNARY)
@@ -19,18 +20,19 @@ def get_parse_from_state(stack, queue):
     return '(TOP ' + stack[0].to_ptb() + ' )'
 
 
-def get_actions(node_labels):
+def get_actions(node_labels, rules):
     actions = [DoShift(), DoMerge()]
     for label in sorted(node_labels):
         actions.append(DoBracket(label=label))
     for label in sorted(node_labels):
-        actions.append(DoUnary(label=label))
+        actions.append(DoUnary(label=label, rules=rules))
     return actions
 
 
 class Action(object):
     nr_actions = 0
-    def __init__(self, label=None):
+    def __init__(self, label=None, rules=None):
+        self.rules = rules
         self.name = MOVE_NAMES[self.move]
         if label:
             try:
@@ -49,6 +51,14 @@ class Action(object):
             return False
         return self._is_gold(stack[-1] if stack else None, next_gold)
 
+    def check_grammar(self, result, *child_nodes):
+        if not self.rules:
+            return True
+        child_labels = tuple(n.label for n in child_nodes)
+        return result in self.rules and child_labels in self.rules[result]
+
+    def is_grammatical(self, stack, queue):
+        return self.is_valid(stack, queue)
 
 class DoShift(Action):
     move = SHIFT
@@ -121,7 +131,7 @@ class DoUnary(Action):
     def apply(self, stack, queue):
         stack.append(tree.Bracket(stack.pop(), label=self.label))
 
-    def is_valid(self, stack, gold):
+    def is_valid(self, stack, queue):
         if not stack:
             return False
         if stack[-1].is_unary:
@@ -130,12 +140,17 @@ class DoUnary(Action):
             return False
         return True
 
+    def is_grammatical(self, stack, queue):
+        if not self.is_valid(stack, queue):
+            return False
+        return self.check_grammar(self.label, stack[-1])
+
     def _is_gold(self, s0, gold_parent):
         if not gold_parent.is_unary:
             return False
         if not gold_parent.span_match(s0):
             return False
-        if self.label and self.label != gold_parent.label:
+        if self.label and gold_parent.label and self.label != gold_parent.label:
             return False
         return True
 
