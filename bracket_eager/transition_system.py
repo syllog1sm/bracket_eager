@@ -146,66 +146,6 @@ def _need_new_bracket(s0, next_gold):
         return False
 
 
-class DoBranching(Action):
-    """Non-unary version of Bracket"""
-    move = BRACKET
-
-    def apply(self, stack, queue):
-        s0 = stack.pop()
-        s1 = stack.pop()
-        bracket = tree.Bracket(s1, label=self.label)
-        bracket.children.append(s0)
-        stack.append(bracket)
-
-    def is_valid(self, stack, queue):
-        if len(stack) < 2:
-            return False
-        return True
-
-    def _is_gold(self, s0, next_gold, starts):
-        if self.label and self.label != next_gold.label:
-            return False
-        if s0.end != next_gold.end:
-            return False
-        # Can we just M the bracket on the stack?
-        if len(s0.children) >= 2 and \
-          not (next_gold.children and s0.span_match(next_gold.children[-1])):
-            return False
-        if s0.span_match(next_gold) and next_gold.is_unary and not s0.is_unary:
-            return False
-        return True
-
-
-class DoUnary(Action):
-    move = UNARY
-
-    def apply(self, stack, queue):
-        stack.append(tree.Bracket(stack.pop(), label=self.label))
-
-    def is_valid(self, stack, queue):
-        if not stack:
-            return False
-        if stack[-1].is_unary:
-            return False
-        if self.label and stack[-1].label == self.label:
-            return False
-        return True
-
-    def is_grammatical(self, stack, queue):
-        if not self.is_valid(stack, queue):
-            return False
-        return self.check_grammar(self.label, stack[-1])
-
-    def _is_gold(self, s0, next_gold):
-        if not next_gold.is_unary:
-            return False
-        if not next_gold.span_match(s0):
-            return False
-        if self.label and next_gold.label and self.label != next_gold.label:
-            return False
-        return True
-
-
 def iter_gold(stack, queue, golds):
     """Iterate through the golds for the oracle, discarding golds whose cost
     is sunk. The stack/queue will be modified in-place by the outside context,
