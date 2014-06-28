@@ -335,7 +335,6 @@ def test_np_to_np():
     s = DoShift()
     m = DoMerge()
     b = DoBracket()
-    u = DoUnary()
 
     s.apply(st, q)
     s.apply(st, q)

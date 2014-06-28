@@ -1,9 +1,9 @@
 import tree
 from .grammar import get_valid_stacks
 
-SHIFT = 0; BRACKET = 1; MERGE = 2; UNARY = 3
-MOVES = (SHIFT, BRACKET, MERGE, UNARY)
-MOVE_NAMES = ('S', 'B', 'M', 'U')
+SHIFT = 0; BRACKET = 1; MERGE = 2
+MOVES = (SHIFT, BRACKET, MERGE)
+MOVE_NAMES = ('S', 'B', 'M')
 
 
 def get_start_state(words, tags):
@@ -47,7 +47,7 @@ class Action(object):
     def is_gold(self, stack, queue, golds):
         if not self.is_valid(stack, queue):
             return False
-        return self._is_gold(stack[-1] if stack else None, golds[0])
+        return self._is_gold(stack[-1] if stack else None, golds)
 
     def check_grammar(self, result, *child_nodes):
         if not self.rules:
@@ -68,10 +68,10 @@ class DoShift(Action):
     def is_valid(self, stack, queue):
         return bool(queue)
 
-    def _is_gold(self, s0, next_gold):
+    def _is_gold(self, s0, golds):
         if not s0:
             return True
-        return s0.end != next_gold.end
+        return s0.end != golds[0].end
 
 
 class DoMerge(Action):
@@ -87,15 +87,10 @@ class DoMerge(Action):
             return False
         return True
 
-    def is_gold(self, stack, queue, golds):
-        if not self.is_valid(stack, queue):
-            return False
+    def _is_gold(self, s0, golds):
         starts = [n.start for n in golds]
         next_gold = golds[0]
-        if not self.is_valid(stack, queue):
-            return False
-        s0 = stack[-1]
-        if stack[-1].unary_depth >= 3:
+        if s0.unary_depth >= 3:
             return True
         if s0.span_match(next_gold):
             return False
@@ -119,7 +114,8 @@ class DoBracket(Action):
             return False
         return True
 
-    def _is_gold(self, s0, next_gold):
+    def _is_gold(self, s0, golds):
+        next_gold = golds[0]
         # Do we end a bracket here? No? Okay, don't add one
         if s0.end != next_gold.end:
             return False
