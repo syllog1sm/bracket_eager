@@ -2,10 +2,14 @@ from collections import defaultdict
 import pickle
 
 
+import numpy
+
+
 class Perceptron(object):
-    def __init__(self, classes=None):
-        # Each feature gets its own weight vector, so weights is a dict-of-arrays
+    def __init__(self, classes):
         self.classes = classes
+        self.class_map = dict((clas, i) for i, clas in enumerate(sorted(classes)))
+        self.nr_class = len(self.classes)
         self.weights = {}
         # The accumulated values, for the averaging. These will be keyed by
         # feature/clas tuples
@@ -32,14 +36,15 @@ class Perceptron(object):
 
     def score(self, features):
         all_weights = self.weights
-        scores = dict((clas, 0) for clas in self.classes)
+        scores_array = numpy.zeros(self.nr_class)
         for feat, value in features.iteritems():
             if value == 0:
                 continue
             if feat not in all_weights:
                 continue
-            for clas, weight in all_weights[feat].iteritems():
-                scores[clas] += value * weight
+            scores_array += all_weights[feat]
+        scores = dict((clas, scores_array[self.class_map[clas]])
+                      for clas in self.classes)
         return scores
 
     def update(self, truth, guess, features):       
@@ -54,15 +59,17 @@ class Perceptron(object):
         if truth == guess:
             self.nr_correct += 1
             return None
+        truth = self.class_map[truth]
+        guess = self.class_map[guess]
         for f in features:
-            weights = self.weights.setdefault(f, {})
-            upd_feat(truth, f, weights.get(truth, 0.0), 1.0)
-            upd_feat(guess, f, weights.get(guess, 0.0), -1.0)
+            weights = self.weights.setdefault(f, numpy.zeros(self.nr_class))
+            upd_feat(truth, f, weights[truth], 1.0)
+            upd_feat(guess, f, weights[guess], -1.0)
 
     def average_weights(self):
         for feat, weights in self.weights.items():
-            new_feat_weights = {}
-            for clas, weight in weights.items():
+            new_feat_weights = numpy.zeros(self.nr_class)
+            for clas, weight in enumerate(weights):
                 param = (feat, clas)
                 total = self._totals[param]
                 total += (self.i - self._tstamps[param]) * weight
