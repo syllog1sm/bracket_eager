@@ -48,12 +48,6 @@ class Perceptron(object):
         return scores
 
     def update(self, truth, guess, features):       
-        def upd_feat(c, f, w, v):
-            param = (f, c)
-            self._totals[param] += (self.i - self._tstamps[param]) * w
-            self._tstamps[param] = self.i
-            self.weights[f][c] = w + v
-
         self.i += 1
         self.nr_total += 1
         if truth == guess:
@@ -62,12 +56,22 @@ class Perceptron(object):
         truth = self.class_map[truth]
         guess = self.class_map[guess]
         for f in features:
-            weights = self.weights.setdefault(f, numpy.zeros(self.nr_class))
-            upd_feat(truth, f, weights[truth], 1.0)
-            upd_feat(guess, f, weights[guess], -1.0)
+            if f not in self.weights:
+                weights = numpy.zeros(self.nr_class)
+                self.weights[f] = weights
+            else:
+                weights = self.weights[f]
+            param = (f, truth)
+            self._totals[param] += (self.i - self._tstamps[param]) * weights[truth]
+            self._tstamps[param] = self.i
+            weights[truth] += 1
+            param = (f, guess)
+            self._totals[param] += (self.i - self._tstamps[param]) * weights[guess]
+            self._tstamps[param] = self.i
+            weights[guess] -= 1
 
     def average_weights(self):
-        for feat, weights in self.weights.items():
+        for feat, weights in self.weights.iteritems():
             new_feat_weights = numpy.zeros(self.nr_class)
             for clas, weight in enumerate(weights):
                 param = (feat, clas)
