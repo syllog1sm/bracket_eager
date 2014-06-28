@@ -33,13 +33,12 @@ class Perceptron(object):
     def score(self, features):
         all_weights = self.weights
         scores = dict((clas, 0) for clas in self.classes)
-        for feat, value in features.items():
+        for feat, value in features.iteritems():
             if value == 0:
                 continue
             if feat not in all_weights:
                 continue
-            weights = all_weights[feat]
-            for clas, weight in weights.items():
+            for clas, weight in all_weights[feat].iteritems():
                 scores[clas] += value * weight
         return scores
 
