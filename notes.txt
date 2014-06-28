@@ -1,0 +1,114 @@
+Hi Yoav,
+
+I think the parser's mostly working, although there may yet be bugs in the
+oracle logic, and the features need tuning. The parser also needs head-finding
+heuristics --- currently I take the left edge.
+
+Basic workflow:
+
+cat /usr/local/data/Penn3/parsed/mrg/wsj/22/*.mrg > dev.mrg
+# I really like the run-time to consume only text. Otherwise I eventually feed
+# in gold tags by accident, or cheat some other way...
+cat dev.mrg | ./bin/get_text.py > dev.txt
+./bin/train.py <model_dir> /usr/local/data/Penn3/ -n 3000
+cat wsj22.txt | ./bin/parse.py <model_dir> > dev.predict
+# Flatten trees and add TOP nodes for evalb
+cat dev.mrg | ./bin/munge_parse.py > dev.gold
+./EVALB/evalb dev.gold dev.predict | tail
+
+Debugging:
+
+# Unit tests for the oracle
+py.test bracket_eager/
+# A little interactive debugging thing, to step through the parser
+./bin/debug_parse.py <model_dir> dev.txt
+
+I've included a greedy POS tagger, which I'm training alongside the parser. I
+find this works quite well; it's always been the same as doing jack-knifed training
+for me. It's slower though, since we're repeating computation we don't need to.
+The greedy POS tagger gets ~96.8 accuracy.
+
+The main files are:
+- parser.py: The parser class, including training functions
+- perceptron.py: The perceptron class.
+- transition_system.py: The transitions and their oracle. This is where the main
+  action is, and the most likely location of bugs. The code's fairly messy ---
+  more on the implementation shortly.
+- tree.py: Classes for traversing trees, matching nodes etc. This might have bugs too,
+           and is a bit messy/inefficient.
+- features.py: Parser feature extraction.
+- grammar.py: I scratched out some ideas about reading in a CFG. This isn't used
+  at the moment, just read in and passed around.
+- read_ptb.py: Consume the PTB strings and get back a list of (start, end, label)
+  tuples, to construct trees from trees.py
+- util.py: A couple of helper functions.
+- bin/*.py: Execution scripts.
+- evalb/ The evaluation stuff. I had to remove an include malloc.h to compile.
+
+I've written quite a lot of tests, which are a pain to maintain as you update
+the code. Tests are nice at first but don't worry about breaking them. They're run
+from py.test, e.g. py.test bracket_eager/ from the top directory.
+
+Okay. So, here are some design notes.
+
+When bin/train.py is run, it tells read_ptb.py to parse the PTB file format,
+and tree.py to construct Node objects for the trees. It then passes them to
+parser.train, along with a directory to make a model.
+
+parser.train looks through the sentences for the set of node labels, and writes
+a config.json file into the model directory, along with any parameters we pass
+in. tagger.setup_dir does similar for the tagger, building a dictionary of unambiguous
+word-tag pairs, and getting the tag set. Once the directories are initialised,
+we pass the model_dir path to parser.Parser.__init__. We then iterate through
+the sentences, calling Parser.train_one and Parser.tagger.train_one.
+
+The parser class holds a Tagger object and a Perceptron object, and a list of
+Action objects that represent the available transitions. There are three Action
+subclasses, DoShift, DoMerge and DoBracket. Each Action has three methods: is_gold,
+is_valid, and apply. At each training step, we find the subset of actions that are
+valid, and predict between them, and then the subset of actions that are gold, to
+pick the best gold class.
+
+A pretty confusing aspect of the oracle is this transition_system.iter_gold
+function. That's a generator function which progressively yields the
+reachable gold-standard brackets.
+
+So, what happens is, you pass in a configuration to iter_gold, and get back
+a generator object. As you parse, the stack and queue objects will be changed
+in-place, which causes the generator to discard brackets, and return an
+updated list that only includes the reachable gold-standard brackets at that
+point.
+
+There are surely less complicated/confusing ways to achieve the same thing. The
+requirement is simply to advance through the depth-first list of gold brackets
+at each parsing state, so that we know which ones are available. What we know
+from our bit of thinking at the conference is that the subset only stays or shrinks:
+unreachable gold brackets stay unreachable; which is the key property that makes
+the oracle easy to calculate.
+
+What makes the oracle logic awkward at the moment is that I advance past a gold
+bracket once it's currently matching the one on the stack. This means that the
+Bracket and Merge oracles need to ask whether the bracket on the stack matches
+the child of the gold-bracket we're looking at. I'm sure this can be cleaned up
+considerably.
+
+You know, maybe you want to just reimplement the oracle :).
+
+I've experimented with introducing a distinct Unary transition, and having Bracket
+be binary-branching. On my small tests (1000 sentences training) this was
+slightly better, but I don't pretend that test was indicative. I've left the
+binary-class versions of the transitions in the code, but note that you need
+to update DoMerge's logic slightly if you try out that version of the transition
+system. If you look through the commit history you can see a commit that references
+an accuracy figure, with the binary version working.
+You might want to experiment with splitting out labelling into its own transition, too.
+
+Finally, having a greedy tagger that we're training alongside the parser makes
+it trivial to integrate the tagging into the parsing loop: we would obtain
+identical results by calling a tag_word function three words into the queue, and
+not using any syntactic features. The familiar trade-off is between pushing the
+tag decision back towards the stack, where you get less POS-tag look-ahead, but
+get better syntactic features to condition on. Shrug. I'm fine with not twiddling
+that knob at all for this paper --- it's simpler not to explore joint tagging,
+given that we only have greedy search, and the search argument is the most compelling
+case for the joint modelling imo.
