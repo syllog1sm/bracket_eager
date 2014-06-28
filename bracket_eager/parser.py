@@ -37,7 +37,7 @@ def train(model_dir, sentences, nr_iter=15):
     tagger.setup_dir(model_dir, [sent.leaves() for sent in sentences])
     parser = Parser(model_dir)
     for itn in range(nr_iter):
-        random.shuffle(sentences)
+        #random.shuffle(sentences)
         for sentence in sentences:
             words = sentence.leaves()
             assert words
@@ -113,7 +113,6 @@ class Parser(object):
 
         tags = self.tagger.tag(word_strings)
         stack, queue = get_start_state(word_strings, tags)
-        b_vp = [a for a in self.actions if a.move == 1 and a.label == 'VP'][0]
         while not is_end_state(stack, queue):
             features = extract_features(stack, queue)
             scores = self.model.score(features)

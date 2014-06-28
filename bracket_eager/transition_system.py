@@ -95,13 +95,13 @@ class DoMerge(Action):
         if not self.is_valid(stack, queue):
             return False
         s0 = stack[-1]
+        if stack[-1].unary_depth >= 3:
+            return True
         if s0.span_match(next_gold):
-            return False
-        if next_gold.child_match(s0):
             return False
         if s0.start in starts:
             return False
-        return True
+        return not _need_new_bracket(s0, next_gold)
 
 
 class DoBracket(Action):
@@ -120,14 +120,28 @@ class DoBracket(Action):
         return True
 
     def _is_gold(self, s0, next_gold):
-        if self.label and self.label != next_gold.label:
-            return False
+        # Do we end a bracket here? No? Okay, don't add one
         if s0.end != next_gold.end:
             return False
-        # Can we just M the bracket on the stack?
-        if not next_gold.child_match(s0):
+        if self.label and self.label != next_gold.label:
             return False
+        return _need_new_bracket(s0, next_gold)
+
+
+def _need_new_bracket(s0, next_gold):
+    """Break this out, because M and B are mutually exclusive here"""
+    # Case 1: We're a leaf (okay, add bracket)
+    if s0.is_leaf:
         return True
+    # Case 2: We match the gold's child
+    elif next_gold.child_match(s0):
+        # ...But we have an unnecessary unary
+        if s0.is_unary and not next_gold.children[-1].is_unary:
+            return False
+        else:
+            return True
+    else:
+        return False
 
 
 class DoBranching(Action):

@@ -304,6 +304,7 @@ def test_unary_oracle_case():
     np.apply(stack, queue)
     assert not golds.next()[0].is_unary
     assert vp.is_gold(stack, queue, golds.next())
+    assert not m.is_gold(stack, queue, golds.next())
     vp.apply(stack, queue)
     m.apply(stack, queue)
     assert np.is_gold(stack, queue, golds.next())
@@ -381,7 +382,7 @@ def test_m_overpredict():
           (NP-SBJ (DT the) (NN agency) )
           (VP (VBZ receives) 
             (NP (JJ specific) (JJ congressional) (NN authorization) )))))
-    (. .) ))"""
+    (. .) ))""".strip()
 
     words, bare_brackets = read_ptb.get_brackets(ptb_str)
     top = tree.from_brackets(words, bare_brackets)
@@ -418,7 +419,64 @@ def test_m_overpredict():
     assert not m.is_gold(st, q, g.next())
 
 
+def test_nested_b():
+    ptb_str = """
+( (S 
+    (NP-SBJ 
+      (NP (JJ Influential) (NNS members) )
+      (PP (IN of) 
+        (NP (DT the) (NNP House) (NNP Ways) 
+          (CC and)
+          (NNP Means) (NNP Committee) )))
+    (VP (VBD introduced) 
+      (NP 
+        (NP (NN legislation) ) ))))""".strip()
+
+    words, bare_brackets = read_ptb.get_brackets(ptb_str)
+    top = tree.from_brackets(words, bare_brackets)
+    leaves = top.leaves()
+
+    st, q = get_start_state([w.lex for w in leaves], [w.label for w in leaves])
+    g = iter_gold(st, q, top.depth_list())
+
+    s = DoShift()
+    m = DoMerge()
+    np = DoBracket('NP')
+    vp = DoBracket('VP')
+    pp = DoBracket('PP')
+    np = DoBracket('NP')
+    sbar = DoBracket('SBAR')
+    b_s = DoBracket('S')
+
+    s.apply(st, q)
+    s.apply(st, q); assert np.is_gold(st, q, g.next())
+    np.apply(st, q); assert not np.is_gold(st, q, g.next())
+    m.apply(st, q)
 
 
+    s.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q)
+    s.apply(st, q); assert s.is_gold(st, q, g.next())
+    s.apply(st, q); assert np.is_gold(st, q, g.next())
+    np.apply(st, q); assert not np.is_gold(st, q, g.next())
+    
+    assert st[-1].end == 9
+    assert st[-1].start == 8 # committee
+    
+    m.apply(st, q) # means
+    m.apply(st, q) # and
+    m.apply(st, q) # ways
+    m.apply(st, q) # house
+    m.apply(st, q) # the
 
+    assert st[-1].start == 3
+    assert pp.is_gold(st, q, g.next())
+    pp.apply(st, q)
+    assert g.next()[0].child_match(st[-1])
+    assert st[-1].is_unary
+    assert m.is_gold(st, q, g.next())
+    
 

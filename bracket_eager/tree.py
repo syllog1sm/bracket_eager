@@ -46,6 +46,12 @@ class Node(object):
             return False
         return self.children[-1].span_match(other)
 
+    def child_eq(self, other):
+        if not self.children:
+            return False
+        return self.children[-1] == other
+
+
     @property
     def unary_depth(self):
         d = 0
