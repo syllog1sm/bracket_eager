@@ -27,9 +27,9 @@ def setup_dir(model_dir, sentences, **kwargs):
     os.mkdir(model_dir)
     node_labels = util.get_node_labels(sentences)
     rules = rules_from_trees(sentences)
-    util.Config.write(model_dir, 'config', node_labels=node_labels,
-                      **kwargs)
-    pickle.dump(rules, open(path.join(model_dir, 'rules.pickle'), 'w'))
+    util.Config.write(model_dir, 'config', node_labels=node_labels, **kwargs)
+    with open(path.join(model_dir, 'rules.pickle'), 'w') as rules_file:
+        pickle.dump(rules, rules_file)
  
 
 def train(model_dir, sentences, nr_iter=15):
@@ -59,7 +59,8 @@ class Parser(object):
         assert os.path.exists(model_dir) and os.path.isdir(model_dir)
         self.model_dir = model_dir
         self.cfg = util.Config.read(model_dir, 'config')
-        self.rules = pickle.load(open(path.join(model_dir, 'rules.pickle')))
+        with open(path.join(model_dir, 'rules.pickle')) as rules_file:
+            self.rules = pickle.load(rules_file)
         self.actions = get_actions(self.cfg.node_labels, self.rules)
         self.model = Perceptron([a.i for a in self.actions])
         if os.path.exists(path.join(model_dir, 'parser.pickle')):

@@ -9,11 +9,13 @@ class Config(object):
 
     @classmethod
     def write(cls, model_dir, name, **kwargs):
-        open(path.join(model_dir, '%s.json' % name), 'w').write(json.dumps(kwargs))
+        with open(path.join(model_dir, '%s.json' % name), 'w') as out_file:
+            out_file.write(json.dumps(kwargs))
 
     @classmethod
     def read(cls, model_dir, name):
-        return cls(**json.load(open(path.join(model_dir, '%s.json' % name))))
+        with open(path.join(model_dir, '%s.json' % name)) as cfg_file:
+            return cls(**json.load(cfg_file))
 
 
 def get_node_labels(sentences):
