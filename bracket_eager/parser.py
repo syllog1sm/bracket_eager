@@ -37,7 +37,7 @@ def train(model_dir, sentences, nr_iter=15):
     tagger.setup_dir(model_dir, [sent.leaves() for sent in sentences])
     parser = Parser(model_dir)
     for itn in range(nr_iter):
-        #random.shuffle(sentences)
+        random.shuffle(sentences)
         for sentence in sentences:
             words = sentence.leaves()
             assert words
