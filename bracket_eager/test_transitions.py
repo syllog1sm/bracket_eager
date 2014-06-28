@@ -71,6 +71,7 @@ def test_end_state(start_state):
     m.apply(stack, queue)
     assert m.is_valid(stack, queue)
     m.apply(stack, queue)
+    m.apply(stack, queue)
     assert is_end_state(stack, queue)
     assert not shift.is_valid(stack, queue)
 
@@ -158,17 +159,19 @@ def test_bracket(ss_state, actions):
     assert stack[0].end == 1
     assert stack[0].production == ('NN', tuple())
     actions[BRACKET].apply(stack, queue)
-    assert stack[0].production == (None, ('NN', 'NN'))
+    assert len(stack[-1].children) == 1
+    assert stack[-1].production == (None, ('NN',))
  
 
 def test_merge(sssb_state, actions):
     stack, queue = sssb_state
+    m = actions[MERGE]
+    m.apply(stack, queue)
     assert len(stack) == 2
     assert stack[0].start == 0
     assert stack[0].end == 1
     assert stack[1].start == 1
     assert stack[1].end == 3
-    m = actions[MERGE]
     q_before = list(queue)
     assert stack[1].production == (None, ('NN', 'NN'))
     m.apply(stack, queue)
@@ -197,7 +200,8 @@ def test_shift_oracle(start_state, g_01_23, actions):
 def test_bracket_oracle(start_state, g_01_23):
     assert len(g_01_23) == 3
     s = DoShift()
-    b = DoBracket()
+    b = DoBracket('NP1')
+    m = DoMerge()
     stack, queue = start_state
     golds = iter_gold(stack, queue, g_01_23)
     s.apply(stack, queue)
@@ -205,9 +209,12 @@ def test_bracket_oracle(start_state, g_01_23):
     s.apply(stack, queue)
     assert b.is_gold(stack, queue, golds.next())
     b.apply(stack, queue)
-    assert stack[-1].start == 0
+    assert stack[-1].start == 1
     assert stack[-1].end == 2
+    assert stack[-1].is_unary
+    assert not golds.next()[0].is_unary
     assert not b.is_gold(stack, queue, golds.next())
+    m.apply(stack, queue)
     s.apply(stack, queue)
     assert s.is_gold(stack, queue, golds.next())
     assert not b.is_gold(stack, queue, golds.next())
@@ -225,6 +232,7 @@ def test_merge_oracle(start_state, g_012_3):
     s.apply(stack, queue)
     s.apply(stack, queue)
     b.apply(stack, queue)
+    m.apply(stack, queue)
     assert not s.is_gold(stack, queue, golds.next())
     assert not b.is_gold(stack, queue, golds.next())
     assert m.is_gold(stack, queue, golds.next())
@@ -247,14 +255,19 @@ def test_gold_top(start_state, g_01_23):
     s.apply(stack, queue)
     s.apply(stack, queue)
     b1.apply(stack, queue)
+    m.apply(stack, queue)
     s.apply(stack, queue)
     s.apply(stack, queue)
     assert not queue
     assert not s.is_valid(stack, queue)
     assert b2.is_gold(stack, queue, golds.next())
     b2.apply(stack, queue)
+    m.apply(stack, queue)
     g = golds.next()
+    assert g[0].child_match(stack[-1])
     assert not m.is_gold(stack, queue, golds.next())
+    assert len(stack) == 2
+    assert stack[-1].end == golds.next()[0].end
     assert b_top.is_gold(stack, queue, golds.next())
 
 
@@ -284,63 +297,17 @@ def test_unary_oracle_case():
     np = DoBracket('NP')
     vp = DoBracket('VP')
     adjp = DoBracket('ADJP')
-    u = DoUnary('NP')
 
     s.apply(stack, queue)
     s.apply(stack, queue)
-    next_gold, _ = golds.next()
-    assert next_gold.is_unary
-    assert u.is_valid(stack, queue)
-    assert u.is_gold(stack, queue, golds.next())
-    u.apply(stack, queue)
+    assert golds.next()[0].is_unary
+    np.apply(stack, queue)
+    assert not golds.next()[0].is_unary
     assert vp.is_gold(stack, queue, golds.next())
     vp.apply(stack, queue)
-    assert u.is_gold(stack, queue, golds.next())
-    u.apply(stack, queue)
-    assert not u.is_valid(stack, queue)
-
-
-def test_unary_oracle_case_labelled():
-    ptb_str = """
-( (S
-    (NP-SBJ
-      (VP (VBG telling)
-        (NP (NNS lies) )))
-    (VP (VBZ is)
-      (ADJP-PRD (JJ wrong) ))
-  (. .) ))""".strip()
-    words, bare_brackets = read_ptb.get_brackets(ptb_str)
-    assert words == ['telling', 'lies', 'is', 'wrong', '.']
-    assert len(bare_brackets) == 11
-    top = tree.from_brackets(words, bare_brackets)
-    assert len(top.leaves()) == len(words), [l.lex for l in top.leaves()]
-    assert len(top.iter_nodes()) == 11
-    assert len(top.depth_list()) == 6
-    leaves = top.leaves()
-
-    stack, queue = get_start_state([w.lex for w in leaves], [w.label for w in leaves])
-    golds = iter_gold(stack, queue, top.depth_list())
-
-    s = DoShift()
-    m = DoMerge()
-    np = DoBracket(label='NP')
-    vp = DoBracket(label='VP')
-    adjp = DoBracket(label='ADJP')
-    u_np = DoUnary(label='NP')
-
-    s.apply(stack, queue)
-    s.apply(stack, queue)
-    next_gold, _ = golds.next()
-    assert next_gold.is_unary
-    assert u_np.is_valid(stack, queue)
-    assert u_np.is_gold(stack, queue, golds.next())
-    u_np.apply(stack, queue)
-    assert vp.is_gold(stack, queue, golds.next())
-    assert not np.is_gold(stack, queue, golds.next())
-    vp.apply(stack, queue)
-    assert u_np.is_gold(stack, queue, golds.next())
-    u_np.apply(stack, queue)
-    assert not u_np.is_valid(stack, queue)
+    m.apply(stack, queue)
+    assert np.is_gold(stack, queue, golds.next())
+    np.apply(stack, queue)
 
 
 
@@ -372,14 +339,16 @@ def test_np_to_np():
     s.apply(st, q)
     s.apply(st, q)
     b.apply(st, q)
+    m.apply(st, q)
     s.apply(st, q)
     s.apply(st, q)
-    u.apply(st, q)
+    b.apply(st, q)
     s.apply(st, q)
     s.apply(st, q)
     s.apply(st, q)
     assert b.is_gold(st, q, g.next())
     b.apply(st, q)
+    m.apply(st, q)
     s.apply(st, q)
     assert not b.is_gold(st, q, g.next())
     s.apply(st, q)
@@ -390,8 +359,8 @@ def test_np_to_np():
     b.apply(st, q)
     m.apply(st, q)
     m.apply(st, q)
-    next_gold = g.next()
-    assert b.is_gold(st, q, g.next()), 'Stack: %s, Gold: %s' % (st[-1], next_gold)
+    m.apply(st, q)
+    assert b.is_gold(st, q, g.next())
 
 
 def test_m_overpredict():
@@ -432,18 +401,20 @@ def test_m_overpredict():
 
     s.apply(st, q) # the
     s.apply(st, q) # bill
-    np.apply(st, q); assert len(st) == 1
+    np.apply(st, q)
+    m.apply(st, q); assert len(st) == 1
     s.apply(st, q) # intends
     s.apply(st, q) # to
     s.apply(st, q) # restrict
     s.apply(st, q) # the
     s.apply(st, q) # rtc
-    np.apply(st, q); assert len(st) == 5
+    np.apply(st, q)
+    m.apply(st, q); assert len(st) == 5
     
     assert not vp.is_gold(st, q, g.next())
     
     vp.apply(st, q)
-
+    m.apply(st, q)
     assert not m.is_gold(st, q, g.next())
 
 

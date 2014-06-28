@@ -39,6 +39,13 @@ class Node(object):
     def span_match(self, o):
         return self.start == o.start and self.end == o.end
 
+    def child_match(self, other):
+        if not self.children:
+            return False
+        if self.children[-1].is_leaf != other.is_leaf:
+            return False
+        return self.children[-1].span_match(other)
+
     @property
     def unary_depth(self):
         d = 0
