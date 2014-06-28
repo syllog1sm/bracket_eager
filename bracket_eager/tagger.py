@@ -8,19 +8,6 @@ START = ['-START-', '-START2-']
 END = ['-END-', '-END2-']
  
  
-class DefaultList(list):
-    """A list that returns a default value if index out of bounds."""
-    def __init__(self, default=None):
-        self.default = default
-        list.__init__(self)
- 
-    def __getitem__(self, index):
-        try:
-            return list.__getitem__(self, index)
-        except IndexError:
-            return self.default
- 
- 
 def setup_dir(model_dir, sentences):
     classes, tagdict = _make_tagdict(sentences)
     util.Config.write(model_dir, 'tagger', tagdict=tagdict, tags=classes)
@@ -59,7 +46,7 @@ class Tagger(object):
 
     def tag(self, words, tokenize=True):
         prev, prev2 = START
-        tags = DefaultList('') 
+        tags = []
         context = START + [self._normalize(w) for w in words] + END
         for i, word in enumerate(words):
             tag = self.tagdict.get(word)
