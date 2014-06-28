@@ -123,6 +123,8 @@ class DoBracket(Action):
         # Do we end a bracket here? No? Okay, don't add one
         if s0.end != next_gold.end:
             return False
+        # If we're doing labelled bracketing, we need to care that _this_
+        # DoBracket instance is the right one
         if self.label and self.label != next_gold.label:
             return False
         return _need_new_bracket(s0, next_gold)
@@ -135,7 +137,7 @@ def _need_new_bracket(s0, next_gold):
         return True
     # Case 2: We match the gold's child
     elif next_gold.child_match(s0):
-        # ...But we have an unnecessary unary
+        # ...But do we have an unnecessary unary?
         if s0.is_unary and not next_gold.children[-1].is_unary:
             return False
         else:
