@@ -72,16 +72,21 @@ class Perceptron(object):
             weights[guess] -= 1
 
     def average_weights(self):
+        to_remove = set()
         for feat, weights in self.weights.iteritems():
-            new_feat_weights = numpy.zeros(self.nr_class)
+            seen_non_zero = False
             for clas, weight in enumerate(weights):
                 param = (feat, clas)
                 total = self._totals[param]
                 total += (self.i - self._tstamps[param]) * weight
                 averaged = round(total / float(self.i), 3)
                 if averaged:
-                    new_feat_weights[clas] = averaged
-            self.weights[feat] = new_feat_weights
+                    weights[clas] = averaged
+                    seen_non_zero = True
+            if not seen_non_zero:
+                to_remove.add(feat)
+        for feat in to_remove:
+            self.weights.pop(feat)
 
     def save(self, path):
         print "Saving model to %s" % path
