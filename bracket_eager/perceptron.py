@@ -43,8 +43,9 @@ class Perceptron(object):
             if feat not in all_weights:
                 continue
             scores_array += all_weights[feat]
-        scores = dict((clas, scores_array[self.class_map[clas]])
-                      for clas in self.classes)
+        scores = {}
+        for clas in self.classes:
+            scores[clas] = scores_array[self.class_map[clas]]
         return scores
 
     def update(self, truth, guess, features):       
