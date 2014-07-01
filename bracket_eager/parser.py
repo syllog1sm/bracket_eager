@@ -107,18 +107,14 @@ class Parser(object):
         # Getting passed a string when you want a list sucks to debug.
         assert not isinstance(word_strings, str)
         assert not isinstance(word_strings, unicode)
-        # This closure is called by the "max" function. It returns a comparison
-        # key, which makes max return the best-scoring valid action.
-        def cmp_valid(action):
-            return (action.is_valid(stack, queue), scores[action.i])
-
         tags = self.tagger.tag(word_strings)
         stack, queue = get_start_state(word_strings, tags)
         while not is_end_state(stack, queue):
             features = extract_features(stack, queue)
             scores = self.model.score(features)
             # Get highest scoring valid action
-            best_action = max(self.actions, key=cmp_valid) 
+            best_action = max([a for a in self.actions if a.is_valid(stack, queue)],
+                              key=lambda a: scores[a.i]) 
             assert best_action.is_valid(stack, queue)
             best_action.apply(stack, queue)
         return get_parse_from_state(stack, queue)
