@@ -2,6 +2,7 @@
 
 import sys
 import plac
+sys.path.append(".")
 import bracket_eager.parser
 
 

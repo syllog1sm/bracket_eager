@@ -163,3 +163,41 @@ def iter_gold(stack, queue, golds):
             golds.pop(0)
         else:
             yield golds
+
+class Oracle(object):
+   def __init__(self, gold_tree):
+      self.gold_tree = gold_tree
+      self.gold_brackets = gold_tree.depth_list()
+      self.next_bracket_i = 0
+      self.next_bracket = self.gold_brackets[0]
+      self._cumloss = 0
+
+   def _advance_bracket(self):
+      self.next_bracket_i += 1
+      self.next_bracket = self.gold_brackets[self.next_bracket_i]
+
+   def _is_reachable(self, span, stack, buffer):
+      if not stack: return spen.start <= buffer[0].start
+      if span.start > stack[-1].end: return True
+      if stack[-1].end > span.end: return False
+      for x in stack:
+         if x.start == span.start: return True
+      return False
+
+   def next_actions(self, stack, queue):
+      if not stack: return [DoShift()]
+      if stack[-1] == self.next_bracket: self._advance_bracket()
+      while (not self._is_reachable(self.next_bracket, stack, buffer)):
+         self._cumloss += 1
+         self._advance_bracket()
+      target = self.next_bracket
+      if stack[-1].span_match(target):
+         # we know they are not equal
+         assert(stack[-1].label != target.label)
+         return [DoBracket(target.label)]
+      if stack[-1].end == target.end:
+         # we know it's reachable, so Merge is fine
+         return [DoMerge()]
+      else:
+         assert stack[-1].end < target.end
+         return [DoShift()]

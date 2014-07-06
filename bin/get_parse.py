@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+sys.path.append(".")
 import plac
 
 from bracket_eager import read_ptb

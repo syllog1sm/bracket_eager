@@ -71,3 +71,12 @@ def read_sentences(ptb_dir, n=0):
             if n != 0 and len(sents) >= n:
                 return sents
     return sents
+
+def read_oneperline(fname, n = None):
+   for i,line in enumerate(file(fname)):
+      if n and i > n: break
+      words, brackets = get_brackets(line)
+      s = tree.from_brackets(words, brackets)
+      #for l in s.leaves():
+      #   l.end = l.start
+      yield s

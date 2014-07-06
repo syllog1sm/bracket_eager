@@ -179,3 +179,9 @@ class Bracket(Node):
         for node in self.children:
             leaves.extend(node.leaves())
         return leaves
+
+def MakeBracket(child0, children, label):
+    b = Bracket(child0, label)
+    b.children.extend(children)
+    return b
+
