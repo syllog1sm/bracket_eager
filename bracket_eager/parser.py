@@ -144,7 +144,7 @@ class Parser(object):
             guess = max(actions, key=lambda a: scores[a.i])
             #if isinstance(guess, DoBracket): unary_chain += 1
             #else: unary_chain = 0
-            oracle_actions = oracle.next_actions(state.stack, state.queue)
+            oracle_actions = oracle.next_actions(state)
             oracle_max = max(oracle_actions, key=lambda a: scores[a.i])
             self.model.update(oracle_max.i, guess.i, features)
             if False and itn == 0:
