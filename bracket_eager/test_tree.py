@@ -30,7 +30,9 @@ def pierre_string():
             "director Nov. 29 .")
  
 def test_branches(pierre_tree):
-    assert pierre_tree.label == 'S'
+    assert pierre_tree.label == 'TOP'
+    assert len(pierre_tree.children) == 1
+    assert pierre_tree.children[0].label == 'S'
 
 def test_leaves(pierre_tree, pierre_string):
     words = pierre_string.split()

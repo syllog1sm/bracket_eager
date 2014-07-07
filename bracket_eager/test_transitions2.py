@@ -72,6 +72,7 @@ def test_end_state(start_state):
     assert m.is_valid(state)
     state = m.apply(state)
     state = m.apply(state)
+    state = DoBracket('TOP').apply(state)
     assert state.is_end_state()
     assert not shift.is_valid(state)
 
@@ -273,8 +274,8 @@ def test_unary_oracle_case():
     assert len(bare_brackets) == 11
     top = tree.from_brackets(words, bare_brackets)
     assert len(top.leaves()) == len(words), [l.lex for l in top.leaves()]
-    assert len(top.iter_nodes()) == 11
-    assert len(top.depth_list()) == 6
+    assert len(top.iter_nodes()) == 12
+    assert len(top.depth_list()) == 7
     leaves = top.leaves()
 
     state = ParserState.from_words_and_tags([w.lex for w in leaves], [w.label for w in leaves])

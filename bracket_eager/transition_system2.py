@@ -22,7 +22,7 @@ class ParserState(object):
       return ParserState(stack, queue)
 
    def is_end_state(self):
-      return len(self.stack) == 1 and not self.queue
+      return len(self.stack) == 1 and (not self.queue) and self.stack[0].label == 'TOP'
 
    def get_parse_from_state(self):
       return '(TOP ' + self.stack[0].to_ptb() + ' )'
@@ -108,9 +108,11 @@ class DoBracket(Action):
        return ParserState(state.stack[:-1] + [bracket], state.queue)
 
     def is_valid(self, state):
+        if self.label == 'TOP':
+           return len(state.stack) == 1 and not state.queue
         if len(state.stack) < 1:
             return False
-        if state.stack[-1].unary_depth >= 3:
+        if state.stack[-1].unary_depth >= 6:
             #print "DEEP UNARY"
             return False
         #    return False
@@ -120,6 +122,10 @@ class DoBracket(Action):
 #   the _cumloss field is not reliable/accurate. Problem - no loss for extra 
 #   bracket action. (because we can always recover with another
 #   bracket, and no loss for precision error)
+#
+# NOTE 2:
+#   The oracle is stateful, and its output depends on previous queries.
+#   This is MOSTLY, but not only, for efficiency reasons. 
 DEBUG=False
 class Oracle(object):
    def __init__(self, gold_tree):
@@ -128,10 +134,14 @@ class Oracle(object):
       self.next_bracket_i = 0
       self.next_bracket = self.gold_brackets[0]
       self._cumloss = 0
+      self._just_matched = False
 
    def _advance_bracket(self):
       self.next_bracket_i += 1
-      self.next_bracket = self.gold_brackets[self.next_bracket_i]
+      if (self.next_bracket_i < len(self.gold_brackets)):
+         self.next_bracket = self.gold_brackets[self.next_bracket_i]
+      else:
+         self.next_bracket = None
 
    def _is_reachable(self, span, stack, buffer):
       if not stack: return span.start <= buffer[0].start
@@ -142,13 +152,18 @@ class Oracle(object):
       return False
 
    def next_actions(self, state):
+      #if self.next_bracket is None: return [DoBracket('TOP')]
       stack, queue = state.stack, state.queue
       if not stack: return [DoShift()]
       if stack[-1] == self.next_bracket:
+         self._just_matched = True
          self._advance_bracket()
+         #if self.next_bracket is None: return [DoBracket('TOP')]
          # unary chain of same type
          if stack[-1] == self.next_bracket:
             return [DoBracket(self.next_bracket.label)]
+      else:
+         self._just_matched = False
       while (not self._is_reachable(self.next_bracket, stack, buffer)):
          self._cumloss += 1
          self._advance_bracket()
@@ -171,7 +186,12 @@ class Oracle(object):
          if stack[-1].label != target.label:
             return [DoBracket(target.label)]
          # we know it's reachable, so Merge is fine
-         return [DoMerge()]
+         if not self._just_matched:
+            return [DoMerge()]
+         else:
+            # but if we just matched a bracket, we need to create
+            # a new one and not expand the previous one.
+            return [DoBracket(target.label)]
       else:
          assert stack[-1].end < target.end
          return [DoShift()]

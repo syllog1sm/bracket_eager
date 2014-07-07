@@ -28,7 +28,7 @@ def from_brackets(words, brackets):
         w.i = i
         w.start = i
         w.end = i+1
-    return top
+    return Bracket(top, 'TOP')
 
 
 class Node(object):
