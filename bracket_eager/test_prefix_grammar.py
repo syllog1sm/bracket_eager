@@ -38,12 +38,12 @@ def test_recursion(recursive_grammar):
     assert max(len(stack) for stack in stacks) < 100
 
 
-ptb_loc = '/usr/local/data/Penn3'
+ptb_loc = path.join(path.dirname(tree.__file__), '../testsdata/WSJ_0001.MRG')
 
 
 @pytest.fixture
 def ptb_text():
-    return open(path.join(ptb_loc, 'parsed', 'mrg', 'wsj', '00', 'wsj_0001.mrg')).read()
+    return open(ptb_loc).read()
 
 
 @pytest.fixture

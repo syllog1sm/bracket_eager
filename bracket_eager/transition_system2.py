@@ -16,7 +16,7 @@ class ParserState(object):
       self.queue = queue
 
    @classmethod
-   def from_sent(cls, words, tags):
+   def from_words_and_tags(cls, words, tags):
       queue = [tree.Word(i, w, t) for i, (w, t) in enumerate(zip(words, tags))]
       stack = []
       return ParserState(stack, queue)
@@ -65,6 +65,9 @@ class Action(object):
 
     def is_grammatical(self, stack, queue):
         return self.is_valid(stack, queue)
+
+    def __eq__(self, other):
+       return self.i == other.i
 
 
 class DoShift(Action):
@@ -138,7 +141,8 @@ class Oracle(object):
          if x.start == span.start: return True
       return False
 
-   def next_actions(self, stack, queue):
+   def next_actions(self, state):
+      stack, queue = state.stack, state.queue
       if not stack: return [DoShift()]
       if stack[-1] == self.next_bracket:
          self._advance_bracket()

@@ -2,7 +2,7 @@ import re
 import os
 from os import path
 
-from . import tree
+import tree
 
 
 def get_brackets(sent_text):

@@ -84,7 +84,7 @@ class Parser(object):
             return (action.is_valid(stack, queue), scores[action.i])
 
         tags = self.tagger.tag(word_strings)
-        state = ParserState.from_sent(word_strings, tags)
+        state = ParserState.from_words_and_tags(word_strings, tags)
         actions_by_name = dict((a.name, a) for a in self.actions)
         #print queue
         while not state.is_end_state():
@@ -117,7 +117,7 @@ class Parser(object):
             return (action.is_valid(state), scores[action.i])
 
         tags = self.tagger.tag(word_strings)
-        state = ParserState.from_sent(word_strings, tags)
+        state = ParserState.from_words_and_tags(word_strings, tags)
         while not state.is_end_state():
             features = extract_features(state.stack, state.queue)
             scores = self.model.score(features)
@@ -131,7 +131,7 @@ class Parser(object):
     def train_one(self, itn, word_strings, gold_tree):
         #print "t",
         tags = self.tagger.tag(word_strings)
-        state = ParserState.from_sent(word_strings, tags)
+        state = ParserState.from_words_and_tags(word_strings, tags)
         oracle = Oracle(gold_tree)
         unary_chain = 0
         while not state.is_end_state():
