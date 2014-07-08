@@ -2,7 +2,7 @@ import os
 from os import path
 from collections import defaultdict
 from . import util
-from .perceptron import Perceptron
+from ml import sml as ml
 
 START = ['-START-', '-START2-']
 END = ['-END-', '-END2-']
@@ -40,9 +40,24 @@ class Tagger(object):
         self.model_dir = model_dir
         self.cfg = util.Config.read(model_dir, 'tagger')
         self.tagdict = self.cfg.tagdict
-        self.model = Perceptron(sorted(self.cfg.tags))
+        self.classes = list(sorted(self.cfg.tags))
+        self.class_map = {c:i for i,c in enumerate(self.classes)}
         if path.exists(path.join(model_dir, 'tagger.pickle')):
-            self.model.load(path.join(model_dir, 'tagger.pickle'))
+            fname = path.join(model_dir, 'tagger.pickle')
+            self.model = ml.SparseMulticlassModel(file(fname),True)
+        else:
+            self.model = ml.SparseMultitronParameters(len(self.cfg.tags))
+        self._nr_updates = 0
+        self._nr_correct = 0
+
+    def clear_stats(self):
+        self._nr_updates = 0
+        self._nr_correct = 0
+
+    @property
+    def accuracy_string(self):
+       return str(self._nr_correct / float(self._nr_correct + self._nr_updates))
+
 
     def tag(self, words, tokenize=True):
         prev, prev2 = START
@@ -52,13 +67,14 @@ class Tagger(object):
             tag = self.tagdict.get(word)
             if not tag:
                 features = self._get_features(i, word, context, prev, prev2)
-                tag = self.model.predict(features)
+                tag, scores = self.model.predict(features)
+                tag = self.classes[tag]
             tags.append(tag)
             prev2 = prev; prev = tag
         return tags
 
     def save(self):
-        self.model.save(path.join(self.model_dir, 'tagger.pickle'))
+        self.model.dump_fin(file(path.join(self.model_dir, 'tagger.pickle'),'w'),True)
 
     def train_one(self, words, tags):
         prev, prev2 = START
@@ -67,14 +83,13 @@ class Tagger(object):
             guess = self.tagdict.get(word)
             if not guess:
                 feats = self._get_features(i, word, context, prev, prev2)
-                guess = self.model.predict(feats)
-                self.model.update(tags[i], guess, feats)
+                guess = self.model.update(self.class_map[tags[i]], feats)
+                guess = self.classes[guess]
+                if guess == tags[i]:
+                   self._nr_correct += 1
+                else:
+                   self._nr_updates += 1
             prev2 = prev; prev = guess
-
-    def load(self, loc):
-        w_td_c = pickle.load(open(loc, 'rb'))
-        self.model.weights, self.tagdict, self.classes = w_td_c
-        self.model.classes = self.classes
 
     def _normalize(self, word):
         if '-' in word and word[0] != '-':
@@ -90,25 +105,26 @@ class Tagger(object):
         '''Map tokens into a feature representation, implemented as a
         {hashable: float} dict. If the features change, a new model must be
         trained.'''
-        def add(name, *args):
-            features[' '.join((name,) + tuple(args))] += 1
+        def add(f, name, *args):
+            f('_'.join((name,) + tuple(args)))
 
         i += len(START)
-        features = defaultdict(int)
+        features = []
+        f = features.append
         # It's useful to have a constant feature, which acts sort of like a prior
-        add('bias')
-        add('i suffix', word[-3:])
-        add('i pref1', word[0])
-        add('i-1 tag', prev)
-        add('i-2 tag', prev2)
-        add('i tag+i-2 tag', prev, prev2)
-        add('i word', context[i])
-        add('i-1 tag+i word', prev, context[i])
-        add('i-1 word', context[i-1])
-        add('i-1 suffix', context[i-1][-3:])
-        add('i-2 word', context[i-2])
-        add('i+1 word', context[i+1])
-        add('i+1 suffix', context[i+1][-3:])
-        add('i+2 word', context[i+2])
+        add(f, 'bias')
+        add(f, 'isuffix', word[-3:])
+        add(f, 'ipref1', word[0])
+        add(f, 'i-1tag', prev)
+        add(f, 'i-2tag', prev2)
+        add(f, 'itag+i-2tag', prev, prev2)
+        add(f, 'iword', context[i])
+        add(f, 'i-1tag+iword', prev, context[i])
+        add(f, 'i-1word', context[i-1])
+        add(f, 'i-1suffix', context[i-1][-3:])
+        add(f, 'i-2word', context[i-2])
+        add(f, 'i+1word', context[i+1])
+        add(f, 'i+1suffix', context[i+1][-3:])
+        add(f, 'i+2word', context[i+2])
         return features
 

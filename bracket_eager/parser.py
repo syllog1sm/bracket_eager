@@ -8,10 +8,14 @@ import time
 import pickle
 import shutil
 
+from ml import sml as ml
+
 from . import util
-from . import tagger
+#from . import tagger as tagger
+from . import mltagger as tagger
 from .perceptron import Perceptron
-from .features import extract_features
+#from .features import extract_features
+from .features2 import extract_features
 
 from .grammar import rules_from_trees
 
@@ -40,20 +44,27 @@ def train(model_dir, sentences, nr_iter=15):
     for itn in range(nr_iter):
         ls = 0
         random.shuffle(sentences)
-        for sentence in sentences:
+        for snum,sentence in enumerate(sentences):
+            if snum % 1000 == 0: print snum
             words = sentence.leaves()
             assert words
             ls += parser.train_one(itn, [w.lex for w in words], sentence)
             parser.tagger.train_one([w.lex for w in words], [w.label for w in words])
-        print itn, 'Parse:', parser.model.accuracy_string,
-        print 'Tag:', parser.tagger.model.accuracy_string
+        #print itn, 'Parse:', parser.model.accuracy_string,
+        print itn, 'Parse:', (parser._total - parser._updates) / float(parser._total),
+        #print 'Tag:', parser.tagger.model.accuracy_string
+        print 'Tag:', parser.tagger.accuracy_string
         print "Cumloss (sort of):",ls
-        parser.model.nr_correct = 0
-        parser.model.nr_total = 0
-        parser.tagger.model.nr_correct = 0
-        parser.tagger.model.nr_total = 0
-    parser.model.average_weights()
-    parser.tagger.model.average_weights()
+        #parser.model.nr_correct = 0
+        #parser.model.nr_total = 0
+        parser._updates = 0
+        parser._total = 0
+        #parser.tagger.model.nr_correct = 0
+        #parser.tagger.model.nr_total = 0
+        parser.tagger.clear_stats()
+
+    #parser.model.average_weights()
+    #parser.tagger.model.average_weights()
     parser.save()
 
 
@@ -65,13 +76,21 @@ class Parser(object):
         with open(path.join(model_dir, 'rules.pickle')) as rules_file:
             self.rules = pickle.load(rules_file)
         self.actions = get_actions(self.cfg.node_labels, self.rules)
-        self.model = Perceptron([a.i for a in self.actions])
         if os.path.exists(path.join(model_dir, 'parser.pickle')):
-            self.model.load(path.join(model_dir, 'parser.pickle'))
+            fname = path.join(model_dir, 'parser.pickle')
+            self.model = ml.SparseMulticlassModel(file(fname),True)
+            #self.model = Perceptron([a.i for a in self.actions])
+            #self.model.load(path.join(model_dir, 'parser.pickle'))
+        else:
+           #self.model = Perceptron([a.i for a in self.actions])
+           self.model = ml.SparseMultitronParameters(len(self.actions))
         self.tagger = tagger.Tagger(model_dir)
+        self._updates = 0
+        self._total = 0
 
     def save(self):
-        self.model.save(path.join(self.model_dir, 'parser.pickle'))
+        #self.model.save(path.join(self.model_dir, 'parser.pickle'))
+        self.model.dump_fin(file(path.join(self.model_dir, 'parser.pickle'),"w"), True)
         self.tagger.save()
  
     def debug_parse(self, word_strings):
@@ -120,9 +139,10 @@ class Parser(object):
         state = ParserState.from_words_and_tags(word_strings, tags)
         while not state.is_end_state():
             features = extract_features(state.stack, state.queue)
-            scores = self.model.score(features)
+            scores = self.model.get_scores(features)
             # Get highest scoring valid action
-            best_action = max(self.actions, key=cmp_valid) 
+            #best_action = max(self.actions, key=cmp_valid) 
+            best_action = max(((s,a) for s,a in zip(scores, self.actions) if a.is_valid(state)))[1]
             assert best_action.is_valid(state)
             newstate = best_action.apply(state)
             state = newstate
@@ -137,7 +157,8 @@ class Parser(object):
         while not state.is_end_state():
             #print format_state(state.stack, state.queue)
             features = extract_features(state.stack, state.queue)
-            scores = self.model.score(features)
+            #for x in features: assert(not ' ' in x), x
+            scores = self.model.get_scores(features)
             actions = [a for a in self.actions if a.is_valid(state)]
             #if unary_chain > 2:
             #   actions = [a for a in self.actions if not isinstance(a, DoBracket)]
@@ -146,8 +167,14 @@ class Parser(object):
             #else: unary_chain = 0
             oracle_actions = oracle.next_actions(state)
             oracle_max = max(oracle_actions, key=lambda a: scores[a.i])
-            self.model.update(oracle_max.i, guess.i, features)
-            if False and itn == 0:
+            self.model.tick()
+            self._total += 1
+            if oracle_max.i != guess.i:
+               self.model.add(features, oracle_max.i, 1)
+               self.model.add(features, guess.i, -1)
+               self._updates += 1
+            #self.model.update(oracle_max.i, guess.i, features)
+            if False:
                state = oracle_max.apply(state)
             else:
                state = guess.apply(state)

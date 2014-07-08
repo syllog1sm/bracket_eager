@@ -25,12 +25,13 @@ class ParserState(object):
       return len(self.stack) == 1 and (not self.queue) and self.stack[0].label == 'TOP'
 
    def get_parse_from_state(self):
-      return '(TOP ' + self.stack[0].to_ptb() + ' )'
+      return self.stack[0].to_ptb()
 
 def get_actions(node_labels, rules):
    actions = [DoShift(), DoMerge()]
    for label in sorted(node_labels):
       actions.append(DoBracket(label=label))
+   [x.i for x in actions]
    return actions
 
 class Action(object):
